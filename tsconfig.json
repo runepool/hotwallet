@@ -29,6 +29,18 @@
       ],
       "@app/wallet/*": [
         "libs/wallet/src/*"
+      ],
+      "@app/engine": [
+        "libs/engine/src"
+      ],
+      "@app/engine/*": [
+        "libs/engine/src/*"
+      ],
+      "@app/blockchain": [
+        "libs/blockchain/src"
+      ],
+      "@app/blockchain/*": [
+        "libs/blockchain/src/*"
       ]
     }
   }

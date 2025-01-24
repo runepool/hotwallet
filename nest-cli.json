@@ -36,6 +36,24 @@
       "compilerOptions": {
         "tsConfigPath": "libs/wallet/tsconfig.lib.json"
       }
+    },
+    "engine": {
+      "type": "library",
+      "root": "libs/engine",
+      "entryFile": "index",
+      "sourceRoot": "libs/engine/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/engine/tsconfig.lib.json"
+      }
+    },
+    "blockchain": {
+      "type": "library",
+      "root": "libs/blockchain",
+      "entryFile": "index",
+      "sourceRoot": "libs/blockchain/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/blockchain/tsconfig.lib.json"
+      }
     }
   }
 }

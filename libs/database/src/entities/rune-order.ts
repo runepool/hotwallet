@@ -5,6 +5,13 @@ export enum RuneOrderType {
   BID = 'bid',
 }
 
+export enum OrderStatus {
+  OPEN = 'open',
+  CLOSED = 'closed',
+  CANCELED = 'canceled',
+}
+
+
 @Entity()
 export class RuneOrder {
   @PrimaryGeneratedColumn('uuid')
@@ -15,6 +22,9 @@ export class RuneOrder {
 
   @Column('bigint')
   quantity: bigint;
+
+  @Column('bigint', { default: 0 })
+  filledQuantity: bigint;
 
   @Column('bigint')
   price: bigint;

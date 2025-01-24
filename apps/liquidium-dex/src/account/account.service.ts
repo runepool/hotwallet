@@ -7,13 +7,13 @@ export class AccountService {
   constructor(private readonly bitcoinWalletService: BitcoinWalletService) {}
 
   async getBalance(): Promise<{ address: string; balance: number }> {
-    const walletInfo = this.bitcoinWalletService.generateP2TRAddress();
+    const address = this.bitcoinWalletService.address;
 
     // Mocking the balance fetching. Replace with actual balance API logic.
     const mockBalance = 0.12345; // Replace this with actual logic
 
     return {
-      address: walletInfo.address,
+      address: address,
       balance: mockBalance,
     };
   }

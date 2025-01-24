@@ -20,19 +20,23 @@
     "test:e2e": "jest --config ./apps/liquidium-dex/test/jest-e2e.json"
   },
   "dependencies": {
+    "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^10.0.0",
+    "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/swagger": "^11.0.3",
     "@nestjs/typeorm": "^11.0.0",
+    "axios": "^1.7.9",
     "better-sqlite3": "^11.8.1",
     "bitcoinjs-lib": "^6.1.7",
+    "ecpair": "^2.1.0",
     "reflect-metadata": "^0.1.13",
+    "runelib": "^1.0.7",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
-    "typeorm": "^0.3.20",
-    "ecpair": "^2.1.0",
-    "tiny-secp256k1": "^2.2.3"
+    "tiny-secp256k1": "^2.2.3",
+    "typeorm": "^0.3.20"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -79,7 +83,9 @@
     ],
     "moduleNameMapper": {
       "^@app/database(|/.*)$": "<rootDir>/libs/database/src/$1",
-      "^@app/wallet(|/.*)$": "<rootDir>/libs/wallet/src/$1"
+      "^@app/wallet(|/.*)$": "<rootDir>/libs/wallet/src/$1",
+      "^@app/engine(|/.*)$": "<rootDir>/libs/engine/src/$1",
+      "^@app/blockchain(|/.*)$": "<rootDir>/libs/blockchain/src/$1"
     }
   }
 }

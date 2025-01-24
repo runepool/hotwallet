@@ -29,6 +29,10 @@ export class RuneOrdersService {
             query.andWhere('order.status = :status', { status });
         }
 
+        query.orderBy({
+            'price': 'ASC'
+        })
+
         return await query.getMany();
     }
 
