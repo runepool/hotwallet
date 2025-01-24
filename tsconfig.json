@@ -41,6 +41,12 @@
       ],
       "@app/blockchain/*": [
         "libs/blockchain/src/*"
+      ],
+      "@app/nostr": [
+        "libs/nostr/src"
+      ],
+      "@app/nostr/*": [
+        "libs/nostr/src/*"
       ]
     }
   }

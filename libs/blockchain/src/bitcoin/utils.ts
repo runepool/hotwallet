@@ -5,7 +5,7 @@ import { taggedHash } from "bitcoinjs-lib/src/crypto";
 import { witnessStackToScriptWitness } from "bitcoinjs-lib/src/psbt/psbtutils";
 
 import ECPairFactory, { ECPairInterface } from "ecpair";
-import * as ecc from "tiny-secp256k1";
+import * as ecc from "@bitcoinerlab/secp256k1";
 
 import { p2sh } from "bitcoinjs-lib/src/payments";
 initEccLib(ecc);

@@ -2,18 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { CreateRuneOrderDto, CreateBatchRuneOrderDto } from '../dto/rune-orders.dto';
 import { RuneOrder } from '@app/database/entities/rune-order';
 import { RuneOrdersService as PersistenceService } from '@app/database/rune-orders/rune-orders.service';
+import { NostrService } from '@app/nostr';
 
 @Injectable()
 export class RuneOrdersService {
-  constructor(private readonly dbService: PersistenceService) {}
+  constructor(
+    private readonly nostrService: NostrService,
+    private readonly dbService: PersistenceService) { }
 
   async createOrder(orderData: CreateRuneOrderDto): Promise<RuneOrder> {
-    return await this.dbService.createOrder({
+    const order = {
       rune: orderData.rune,
       price: BigInt(orderData.price),
       quantity: BigInt(orderData.quantity),
       type: orderData.type
-    });
+    } as RuneOrder;
+
+    await this.nostrService.publishOrder(order);
+    const orders = await this.dbService.createOrder(order);
+    return orders;
+
   }
 
   async createBatchOrders(batchData: CreateBatchRuneOrderDto): Promise<RuneOrder[]> {
@@ -23,6 +31,11 @@ export class RuneOrdersService {
       quantity: BigInt(order.quantity),
       type: order.type
     }));
+
+    for (const order of orders) {
+      await this.nostrService.publishOrder(order as any);
+    }
+    
     return await this.dbService.createBatchOrders(orders);
   }
 

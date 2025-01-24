@@ -54,6 +54,15 @@
       "compilerOptions": {
         "tsConfigPath": "libs/blockchain/tsconfig.lib.json"
       }
+    },
+    "nostr": {
+      "type": "library",
+      "root": "libs/nostr",
+      "entryFile": "index",
+      "sourceRoot": "libs/nostr/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/nostr/tsconfig.lib.json"
+      }
     }
   }
 }

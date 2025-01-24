@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import * as bitcoin from 'bitcoinjs-lib';
 import ECPairFactory, { ECPairInterface } from 'ecpair';
-import * as ecc from 'tiny-secp256k1';
+import * as ecc from '@bitcoinerlab/secp256k1';
 import * as dotenv from 'dotenv';
 import { toXOnly } from "bitcoinjs-lib/src/psbt/bip371";
 import { tweakSigner } from '@app/blockchain/bitcoin/utils';

@@ -8,15 +8,19 @@ import { OrderStatus, RuneOrder } from '@app/database/entities/rune-order';
 import { PendingTransactionsService } from '@app/database/pending-transactions/pending-transactions.service';
 import { RuneOrdersService } from '@app/database/rune-orders/rune-orders.service';
 import { BitcoinWalletService } from '@app/wallet';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Psbt } from 'bitcoinjs-lib';
 import { Errors, OracleError } from 'libs/errors/errors';
 import { Edict, none, RuneId, Runestone } from 'runelib';
 import { FillRuneOrderOffer, RuneFillRequest } from './types';
+import { NostrService } from '@app/nostr';
+import { Event } from 'nostr-tools';
 
+export const PUB_EVENT = 69420;
+export const SUB_EVENT = 69421;
 
 @Injectable()
-export class RuneEngineService {
+export class RuneEngineService implements OnModuleInit {
     constructor(
         private readonly orderService: RuneOrdersService,
         private readonly bitcoinService: BitcoinService,
@@ -24,7 +28,32 @@ export class RuneEngineService {
         private readonly runeService: RunesService,
         private readonly pendingTransactionService: PendingTransactionsService,
         private readonly blockchainService: BlockchainService,
+        private readonly nostrService: NostrService
     ) { }
+
+    onModuleInit() {
+        this.nostrService.subscribeToEvents(SUB_EVENT, async (event: Event) => {
+            try {
+                const fillOrderRequest = Object.assign(new RuneFillRequest(), JSON.parse(Buffer.from(event.content, 'base64').toString('utf-8')));
+                const result = await this.process(fillOrderRequest);
+                this.nostrService.publishDirectMessage(JSON.stringify(result), event.pubkey);
+            } catch (error) {
+                console.log("Error", error);
+                Logger.error("Could not decode nostr event")
+            }
+        })
+    }
+
+    async process(fillRequest: RuneFillRequest): Promise<FillRuneOrderOffer> {
+        try {
+
+            const handler = fillRequest.side === 'buy' ? this.handleBuy : this.handleSell;
+            const fillOffer = await handler(fillRequest);
+            return fillOffer;
+        } catch (error) {
+            Logger.log(`Error ${error}`)
+        }
+    }
 
     async handleBuy(req: RuneFillRequest): Promise<FillRuneOrderOffer> {
         // Get rune info
@@ -125,16 +154,6 @@ export class RuneEngineService {
         throw "Not implemented";
     }
 
-    async process(fillRequest: RuneFillRequest): Promise<FillRuneOrderOffer> {
-        try {
-
-            const handler = fillRequest.side === 'buy' ? this.handleBuy : this.handleSell;
-            const fillOffer = await handler(fillRequest);
-            return fillOffer;
-        } catch (error) {
-            Logger.log(`Error ${error}`)
-        }
-    }
 
 
     async selectRuneOutputs(runeOutputs: UnspentOutput[], runeId: string, runeAmount: bigint, usedOutputs: UnspentOutput[]) {

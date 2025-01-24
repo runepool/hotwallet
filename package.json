@@ -31,12 +31,14 @@
     "better-sqlite3": "^11.8.1",
     "bitcoinjs-lib": "^6.1.7",
     "ecpair": "^2.1.0",
+    "nostr-tools": "^2.10.4",
     "reflect-metadata": "^0.1.13",
     "runelib": "^1.0.7",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
-    "tiny-secp256k1": "^2.2.3",
-    "typeorm": "^0.3.20"
+    "@bitcoinerlab/secp256k1": "^1.2.0",
+    "typeorm": "^0.3.20",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -48,6 +50,7 @@
     "@types/supertest": "^6.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "commander": "^13.1.0",
     "eslint": "^8.42.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
@@ -85,7 +88,8 @@
       "^@app/database(|/.*)$": "<rootDir>/libs/database/src/$1",
       "^@app/wallet(|/.*)$": "<rootDir>/libs/wallet/src/$1",
       "^@app/engine(|/.*)$": "<rootDir>/libs/engine/src/$1",
-      "^@app/blockchain(|/.*)$": "<rootDir>/libs/blockchain/src/$1"
+      "^@app/blockchain(|/.*)$": "<rootDir>/libs/blockchain/src/$1",
+      "^@app/nostr(|/.*)$": "<rootDir>/libs/nostr/src/$1"
     }
   }
 }
