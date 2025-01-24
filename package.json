@@ -26,10 +26,13 @@
     "@nestjs/swagger": "^11.0.3",
     "@nestjs/typeorm": "^11.0.0",
     "better-sqlite3": "^11.8.1",
+    "bitcoinjs-lib": "^6.1.7",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
-    "typeorm": "^0.3.20"
+    "typeorm": "^0.3.20",
+    "ecpair": "^2.1.0",
+    "tiny-secp256k1": "^2.2.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -75,7 +78,8 @@
       "<rootDir>/libs/"
     ],
     "moduleNameMapper": {
-      "^@app/database(|/.*)$": "<rootDir>/libs/database/src/$1"
+      "^@app/database(|/.*)$": "<rootDir>/libs/database/src/$1",
+      "^@app/wallet(|/.*)$": "<rootDir>/libs/wallet/src/$1"
     }
   }
 }

@@ -1,3 +1,4 @@
+import { RuneOrderType } from '@app/database/entities/rune-order';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateRuneOrderDto {
@@ -9,6 +10,9 @@ export class CreateRuneOrderDto {
 
   @ApiProperty({ description: 'The price per unit of the rune', example: '45000' }) // Represent BigInt as string in Swagger
   price: string;
+
+  @ApiProperty({ description: 'The order type', example: 'ask' })
+  type: RuneOrderType;
 }
 
 export class UpdateRuneOrderDto {
@@ -20,6 +24,9 @@ export class UpdateRuneOrderDto {
 
   @ApiProperty({ description: 'The updated quantity', example: '2', required: false }) // Represent BigInt as string in Swagger
   quantity?: string;
+
+  @ApiProperty({ description: 'The updated order type', example: 'bid', required: false })
+  type?: 'ask' | 'bid';
 }
 
 export class CreateBatchRuneOrderDto {

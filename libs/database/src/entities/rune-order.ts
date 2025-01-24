@@ -1,5 +1,10 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
+export enum RuneOrderType {
+  ASK = 'ask',
+  BID = 'bid',
+}
+
 @Entity()
 export class RuneOrder {
   @PrimaryGeneratedColumn('uuid')
@@ -16,6 +21,9 @@ export class RuneOrder {
 
   @Column({ default: 'open' })
   status: string;
+
+  @Column({ type: 'text' })
+  type: RuneOrderType;
 
   @CreateDateColumn()
   createdAt: Date;

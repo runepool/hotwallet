@@ -12,6 +12,7 @@ export class RuneOrdersService {
       rune: orderData.rune,
       price: BigInt(orderData.price),
       quantity: BigInt(orderData.quantity),
+      type: orderData.type
     });
   }
 
@@ -20,6 +21,7 @@ export class RuneOrdersService {
       rune: order.rune,
       price: BigInt(order.price),
       quantity: BigInt(order.quantity),
+      type: order.type
     }));
     return await this.dbService.createBatchOrders(orders);
   }
