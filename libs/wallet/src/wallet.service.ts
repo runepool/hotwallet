@@ -44,7 +44,6 @@ export class BitcoinWalletService implements OnModuleInit {
     signPsbt(psbt: bitcoin.Psbt, inputs: number[]) {
         inputs.forEach(input => {
             psbt.signInput(input, tweakSigner(this.signer));
-            psbt.finalizeInput(input);
         })
 
         return psbt;
@@ -63,7 +62,7 @@ export class BitcoinWalletService implements OnModuleInit {
     private generateP2TRAddress(): { address: string; type: string } {
         try {
             const keyPair = this.signer;
-            const { address } = bitcoin.payments.p2tr({ pubkey: toXOnly(keyPair.publicKey), network: this.network });
+            const { address } = bitcoin.payments.p2tr({ internalPubkey: toXOnly(keyPair.publicKey), network: this.network });
             if (!address) {
                 throw new Error('Failed to generate P2TR address.');
             }

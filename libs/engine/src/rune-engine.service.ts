@@ -9,7 +9,7 @@ import { PendingTransactionsService } from '@app/database/pending-transactions/p
 import { RuneOrdersService } from '@app/database/rune-orders/rune-orders.service';
 import { BitcoinWalletService } from '@app/wallet';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Psbt } from 'bitcoinjs-lib';
+import { Psbt, Transaction } from 'bitcoinjs-lib';
 import { Errors, OracleError } from 'libs/errors/errors';
 import { Edict, none, RuneId, Runestone } from 'runelib';
 import { FillRuneOrderOffer, RuneFillRequest } from './types';
@@ -36,10 +36,10 @@ export class RuneEngineService implements OnModuleInit {
             try {
                 const fillOrderRequest = Object.assign(new RuneFillRequest(), JSON.parse(Buffer.from(event.content, 'base64').toString('utf-8')));
                 const result = await this.process(fillOrderRequest);
-                this.nostrService.publishDirectMessage(JSON.stringify(result), event.pubkey);
+                await this.nostrService.publishDirectMessage(JSON.stringify(result), event.pubkey);
             } catch (error) {
                 console.log("Error", error);
-                Logger.error("Could not decode nostr event")
+                // Logger.error("Could not decode nostr event")
             }
         })
     }
@@ -47,9 +47,11 @@ export class RuneEngineService implements OnModuleInit {
     async process(fillRequest: RuneFillRequest): Promise<FillRuneOrderOffer> {
         try {
 
-            const handler = fillRequest.side === 'buy' ? this.handleBuy : this.handleSell;
-            const fillOffer = await handler(fillRequest);
-            return fillOffer;
+            if (fillRequest.side === 'buy') {
+                return this.handleBuy(fillRequest);
+            } else {
+                return this.handleSell(fillRequest);
+            }
         } catch (error) {
             Logger.log(`Error ${error}`)
         }
@@ -59,46 +61,50 @@ export class RuneEngineService implements OnModuleInit {
         // Get rune info
         const runeInfo = await this.runeService.getRuneInfo(req.rune);
         // Check to see if we have any available orders
-        const orders = await this.orderService.getOrders(runeInfo.rune_name, OrderStatus.OPEN);
-        let remainingFillAmount = req.runeAmount;
+        const orders = await this.orderService.getOrders(runeInfo.spaced_rune_name, OrderStatus.OPEN);
+        // Remaining sats to fill
+        let remainingFillAmount = BigInt(req.amount);
+        let runeAmount = 0n;
         let order: RuneOrder;
         const selectedOrders: { order: RuneOrder, usedAmount: bigint }[] = [];
 
         while (order = orders.shift()) {
             const availableOrderAmount = order.quantity - order.filledQuantity;
-            if (availableOrderAmount >= remainingFillAmount) {
-                order.filledQuantity += remainingFillAmount;
+            const availableOrderAmountInSats = Number(availableOrderAmount * order.price) / 10 ** runeInfo.decimals;
+
+            if (availableOrderAmountInSats >= remainingFillAmount) {
+                runeAmount = BigInt(Math.ceil(Number(remainingFillAmount) / Number(order.price))) as bigint;
+                order.filledQuantity = BigInt(order.filledQuantity)
+                order.filledQuantity += runeAmount;
                 selectedOrders.push({ order, usedAmount: remainingFillAmount });
                 remainingFillAmount = 0n;
                 break;
             }
 
-            remainingFillAmount -= availableOrderAmount;
+            remainingFillAmount -= BigInt(Math.ceil(availableOrderAmountInSats));
             order.filledQuantity += availableOrderAmount;
+            order.status = OrderStatus.CLOSED;
+            runeAmount += BigInt(availableOrderAmount);
             selectedOrders.push({ order, usedAmount: availableOrderAmount });
         }
 
         if (remainingFillAmount > 0) {
             throw "Insufficient funds to fill this order"
         }
-        // Prepare psbt
-        const priceSum = selectedOrders.reduce((prev, curr) => prev += curr.order.price, 0n);
-        const avgPrice = Number(priceSum) / selectedOrders.length;
-        const totalPrice = Math.ceil(avgPrice * Number(req.runeAmount));
 
         const runeId = new RuneId(+runeInfo.rune_id.split(":")[0], +runeInfo.rune_id.split(":")[1]);
 
         // Get the collateral unspent outputs
-        const runeOutputs = await this.runeService.getRunesUnspentOutputs(this.walletService.address, req.rune, this.walletService.publicKey);
+        const runeOutputs = await this.runeService.getRunesUnspentOutputs(this.walletService.address, runeInfo.rune_id, this.walletService.publicKey);
         if (!runeOutputs || runeOutputs.length === 0) {
             throw new OracleError(Errors.NO_RUNE_OUTPUTS_AVAILABLE);
         }
 
         const selectedOutputs: UnspentOutput[] = [];
-        const { hasRuneChange } = await this.selectRuneOutputs(runeOutputs, runeInfo.rune_id, req.runeAmount, selectedOutputs);
+        const { hasRuneChange } = await this.selectRuneOutputs(runeOutputs, runeInfo.rune_id, req.amount, selectedOutputs);
 
         const receiverOutpoint = hasRuneChange ? 2 : 1;
-        const edict = new Edict(runeId, req.runeAmount, receiverOutpoint);
+        const edict = new Edict(runeId, runeAmount, receiverOutpoint);
         const runestone = new Runestone([edict], none(), none(), none());
         const swapPsbt = new Psbt({ network: this.walletService.network });
 
@@ -128,24 +134,27 @@ export class RuneEngineService implements OnModuleInit {
 
         swapPsbt.addOutput({
             address: this.walletService.address,
-            value: totalPrice
+            value: Number(req.amount)
         });
 
         // Get funding unspent outputs
         const fundingOutputs = await this.blockchainService.getValidFundingInputs(req.takerAddress, req.takePublicKey);
         const feeRate = await this.bitcoinService.getFeeRate();
         const buyerInputsToSign: SignableInput[] = [];
-        appendUnspentOutputsAsNetworkFee(swapPsbt, fundingOutputs, [], req.takerAddress, feeRate, buyerInputsToSign);
+        const { fee } = appendUnspentOutputsAsNetworkFee(swapPsbt, fundingOutputs, [], req.takerAddress, feeRate, buyerInputsToSign);
         const psbt = this.walletService.signPsbt(swapPsbt, sellerInputsToSign.map(item => item.index));
 
         const pendingTx = new PendingTransaction();
         pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
-
+        pendingTx.txid = Transaction.fromBuffer(psbt.data.getTransaction()).getId();
         await this.pendingTransactionService.create(pendingTx);
 
+        Logger.log(`Offer: Rune${runeAmount} | Sats: ${req.amount}`);
         return {
+            fee,
             psbtBase64: psbt.toBase64(),
-            takerInputsToSign: buyerInputsToSign
+            takerInputsToSign: buyerInputsToSign,
+            provider: process.env['NAME'],
         }
     }
 

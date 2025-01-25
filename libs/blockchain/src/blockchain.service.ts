@@ -44,7 +44,7 @@ export class BlockchainService {
 
         sanitizedOutputs.sort((a, b) => b.amount - a.amount);
         // We prioritize unused outputs by placing then at at the start of the list
-        let validOutputs: UnspentOutput[] = [];
+        let validOutputs: UnspentOutput[] = sanitizedOutputs;
 
         if (process.env.BRANCH_AND_BOUND_ENABLED === 'true' && amount && feeRate) {
             const optimizedOutputs = branchAndBoundUTXOSelection(validOutputs, amount, feeRate);
@@ -53,7 +53,7 @@ export class BlockchainService {
             }
         }
 
-        return [...validOutputs,];
+        return [...validOutputs];
     }
 
     /**

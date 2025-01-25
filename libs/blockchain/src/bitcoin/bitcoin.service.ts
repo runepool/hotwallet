@@ -23,7 +23,7 @@ export class InvalidSequenceError extends Error { }
 export class BitcoinService {
   network: Network;
   url =
-    process.env.BITCOIN_NETWORK !== 'bitcoin'
+    process.env.BITCOIN_NETWORK !== 'mainnet'
       ? `https://liquidium.mempool.space/${process.env.BITCOIN_NETWORK}/api`
       : `https://liquidium.mempool.space/api`;
 

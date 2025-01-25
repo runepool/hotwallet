@@ -23,7 +23,7 @@ export class RuneOrder {
   @Column('bigint')
   quantity: bigint;
 
-  @Column('bigint', { default: 0 })
+  @Column('bigint', { default: 0n })
   filledQuantity: bigint;
 
   @Column('bigint')

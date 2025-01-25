@@ -1,4 +1,5 @@
 import { RuneOrder } from '@app/database/entities/rune-order';
+import { PUB_EVENT } from '@app/engine';
 import { Injectable } from '@nestjs/common';
 import { Event, finalizeEvent, getPublicKey, SimplePool } from 'nostr-tools';
 
@@ -8,9 +9,8 @@ import * as WebSocket from 'ws';
 @Injectable()
 export class NostrService {
     private readonly relayUrls = [
-        "wss://relayable.org",
-        "wss://relay.damus.io",
-        "wss://norst.wine"
+        'wss://relay.damus.io',
+        'wss://relay.nostr.band'
     ];
     private privateKey: Uint8Array;
     private publicKey: string;
@@ -28,7 +28,7 @@ export class NostrService {
     async publishOrder(content: RuneOrder): Promise<void> {
 
         const event = {
-            kind: 30078, // Kind 30078: p2p order
+            kind: PUB_EVENT, // Kind 30078: p2p order
             created_at: Math.floor(Date.now() / 1000),
             tags: [
                 ["s", content.type],
@@ -48,13 +48,16 @@ export class NostrService {
 
     async subscribeToEvents(kind: number, callback: any): Promise<void> {
         const h = this.pool.subscribeMany(this.relayUrls, [
-            { kinds: [kind] }
+            { kinds: [kind], }
         ], {
             onevent: (event: Event) => {
-                callback(event);
+                if (event.created_at * 1000 >= Date.now() - 5000) {
+                    callback(event);
+                }
             },
             oneose() {
-                h.close()
+                console.log("Closing");
+
             }
         })
     }
@@ -67,7 +70,8 @@ export class NostrService {
             tags: [['p', receiverPublicKey]],
             content,
         };
-        this.pool.publish(this.relayUrls, finalizeEvent(event, this.privateKey));
-        console.log('Published admin message:', event);
+
+        await Promise.all(this.pool.publish(this.relayUrls, finalizeEvent(event, this.privateKey)));
+
     }
 }

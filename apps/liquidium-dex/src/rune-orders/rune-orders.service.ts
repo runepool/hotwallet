@@ -3,40 +3,49 @@ import { CreateRuneOrderDto, CreateBatchRuneOrderDto } from '../dto/rune-orders.
 import { RuneOrder } from '@app/database/entities/rune-order';
 import { RuneOrdersService as PersistenceService } from '@app/database/rune-orders/rune-orders.service';
 import { NostrService } from '@app/nostr';
+import { RunesService } from '@app/blockchain/runes/runes.service';
 
 @Injectable()
 export class RuneOrdersService {
   constructor(
     private readonly nostrService: NostrService,
+    private readonly runeService: RunesService,
     private readonly dbService: PersistenceService) { }
 
   async createOrder(orderData: CreateRuneOrderDto): Promise<RuneOrder> {
+
+    const runeInfo = await this.runeService.getRuneInfo(orderData.rune);
+
     const order = {
       rune: orderData.rune,
       price: BigInt(orderData.price),
-      quantity: BigInt(orderData.quantity),
+      quantity: BigInt(+orderData.quantity * 10 ** runeInfo.decimals),
       type: orderData.type
     } as RuneOrder;
 
-    await this.nostrService.publishOrder(order);
+    // await this.nostrService.publishOrder(order);
     const orders = await this.dbService.createOrder(order);
     return orders;
 
   }
 
   async createBatchOrders(batchData: CreateBatchRuneOrderDto): Promise<RuneOrder[]> {
-    const orders = batchData.orders.map(order => ({
-      rune: order.rune,
-      price: BigInt(order.price),
-      quantity: BigInt(order.quantity),
-      type: order.type
-    }));
+    const orders = batchData.orders.map(async order => {
+      const runeInfo = await this.runeService.getRuneInfo(order.rune);
+
+      return ({
+        rune: order.rune,
+        price: BigInt(order.price),
+        quantity: BigInt(+order.quantity * 10 ** runeInfo.decimals),
+        type: order.type
+      })
+    });
 
     for (const order of orders) {
-      await this.nostrService.publishOrder(order as any);
+      // await this.nostrService.publishOrder(order as any);
     }
-    
-    return await this.dbService.createBatchOrders(orders);
+
+    return await this.dbService.createBatchOrders(await Promise.all(orders));
   }
 
   async getOrders(asset?: string, status?: string): Promise<RuneOrder[]> {
