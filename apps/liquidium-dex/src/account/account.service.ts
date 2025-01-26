@@ -4,17 +4,20 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AccountService {
-  constructor(private readonly bitcoinWalletService: BitcoinWalletService) {}
+  constructor(private readonly bitcoinWalletService: BitcoinWalletService) { }
 
-  async getBalance(): Promise<{ address: string; balance: number }> {
+  async getBalance(): Promise<{ address: string; balance: number, token: string }[]> {
     const address = this.bitcoinWalletService.address;
 
     // Mocking the balance fetching. Replace with actual balance API logic.
     const mockBalance = 0.12345; // Replace this with actual logic
 
-    return {
+    return [{
       address: address,
+      token: "demo",
       balance: mockBalance,
-    };
+    }];
   }
+
+
 }

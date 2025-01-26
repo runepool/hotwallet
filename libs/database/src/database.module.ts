@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RuneOrdersModule } from './rune-orders/rune-orders.module';
-import { PendingTransactionsModule } from './pending-transactions/pending-transactions.module';
+import { TransactionsDbModule } from './transactions/pending-transactions.module';
 
 @Module({
   imports: [
@@ -13,9 +13,9 @@ import { PendingTransactionsModule } from './pending-transactions/pending-transa
       synchronize: true, // Auto-create tables in dev; disable in production
     }),
     RuneOrdersModule,
-    PendingTransactionsModule
+    TransactionsDbModule
   ],
-  exports: [RuneOrdersModule, PendingTransactionsModule],
+  exports: [RuneOrdersModule, TransactionsDbModule],
 })
 export class DatabaseModule { }
 

@@ -3,18 +3,20 @@ import { BitcoinService } from '@app/blockchain/bitcoin/bitcoin.service';
 import { SignableInput, UnspentOutput } from '@app/blockchain/bitcoin/types/UnspentOutput';
 import { appendUnspentOutputsAsNetworkFee } from '@app/blockchain/psbtUtils';
 import { RunesService } from '@app/blockchain/runes/runes.service';
-import { PendingTransaction } from '@app/database/entities/pending-transaction';
+
 import { OrderStatus, RuneOrder, RuneOrderType } from '@app/database/entities/rune-order';
-import { PendingTransactionsService } from '@app/database/pending-transactions/pending-transactions.service';
+
+import { Transaction as Trade } from '@app/database/entities/transactions';
 import { RuneOrdersService } from '@app/database/rune-orders/rune-orders.service';
+import { TransactionsDbService } from '@app/database/transactions/transactions.service';
+import { NostrService } from '@app/nostr';
 import { BitcoinWalletService } from '@app/wallet';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Psbt, Transaction } from 'bitcoinjs-lib';
 import { Errors, OracleError } from 'libs/errors/errors';
+import { Event } from 'nostr-tools';
 import { Edict, none, RuneId, Runestone } from 'runelib';
 import { FillRuneOrderOffer, RuneFillRequest } from './types';
-import { NostrService } from '@app/nostr';
-import { Event } from 'nostr-tools';
 
 export const PUB_EVENT = 69420;
 export const SUB_EVENT = 69421;
@@ -26,7 +28,7 @@ export class RuneEngineService implements OnModuleInit {
         private readonly bitcoinService: BitcoinService,
         private readonly walletService: BitcoinWalletService,
         private readonly runeService: RunesService,
-        private readonly pendingTransactionService: PendingTransactionsService,
+        private readonly transactionsDbService: TransactionsDbService,
         private readonly blockchainService: BlockchainService,
         private readonly nostrService: NostrService
     ) { }
@@ -144,10 +146,17 @@ export class RuneEngineService implements OnModuleInit {
         const { fee } = appendUnspentOutputsAsNetworkFee(swapPsbt, fundingOutputs, [], req.takerPaymentAddress, feeRate, buyerInputsToSign);
         const psbt = this.walletService.signPsbt(swapPsbt, sellerInputsToSign.map(item => item.index));
 
-        const pendingTx = new PendingTransaction();
+        const pendingTx = new Trade();
         pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
         pendingTx.txid = Transaction.fromBuffer(psbt.data.getTransaction()).getId();
-        await this.pendingTransactionService.create(pendingTx);
+        pendingTx.amount = runeAmount.toString()
+
+        // Prepare psbt
+        const priceSum = selectedOrders.reduce((prev, curr) => prev += curr.order.price, 0n);
+        const avgPrice = Number(priceSum) / selectedOrders.length;
+        pendingTx.price = avgPrice.toString();
+        await this.transactionsDbService.create(pendingTx);
+        await this.orderService.save(selectedOrders.map(item => item.order));
 
         Logger.log(`Offer: Rune${runeAmount} | Sats: ${req.amount}`);
         return {
@@ -244,10 +253,18 @@ export class RuneEngineService implements OnModuleInit {
         const { fee } = appendUnspentOutputsAsNetworkFee(swapPsbt, fundingOutputs, [], this.walletService.address, feeRate, buyerInputsToSign);
         const psbt = this.walletService.signPsbt(swapPsbt, buyerInputsToSign.map(item => item.index));
 
-        const pendingTx = new PendingTransaction();
+        const pendingTx = new Trade();
         pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
         pendingTx.txid = Transaction.fromBuffer(psbt.data.getTransaction()).getId();
-        await this.pendingTransactionService.create(pendingTx);
+        pendingTx.amount = req.amount.toString()
+
+        // Prepare psbt
+        const priceSum = selectedOrders.reduce((prev, curr) => prev += curr.order.price, 0n);
+        const avgPrice = Number(priceSum) / selectedOrders.length;
+        pendingTx.price = avgPrice.toString();
+        await this.transactionsDbService.create(pendingTx);
+        await this.orderService.save(selectedOrders.map(item => item.order));
+
 
         Logger.log(`Offer: Rune${req.amount} | Sats: ${quoteAmount}`);
         return {
@@ -257,7 +274,6 @@ export class RuneEngineService implements OnModuleInit {
             provider: process.env['NAME'],
         }
     }
-
 
     async selectRuneOutputs(runeOutputs: UnspentOutput[], runeId: string, runeAmount: bigint, usedOutputs: UnspentOutput[]) {
         let hasRuneChange = false;

@@ -14,7 +14,7 @@ export class RuneOrdersService {
         return await this.runeOrderRepository.save(orderData);
     }
 
-    async createBatchOrders(batchData: DeepPartial<RuneOrder>[]): Promise<RuneOrder[]> {
+    async save(batchData: DeepPartial<RuneOrder>[]): Promise<RuneOrder[]> {
         return await this.runeOrderRepository.save(batchData);
     }
 

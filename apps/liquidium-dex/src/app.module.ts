@@ -5,13 +5,15 @@ import { AccountController } from './account/account.controller';
 import { AccountModule } from './account/account.module';
 import { RuneOrdersController } from './rune-orders/rune-orders.controller';
 import { RuneOrdersModule } from "./rune-orders/rune-orders.module";
+import { PendingTransactionsModule } from './pending-transactions/pending-transactions.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     RuneOrdersModule,
     AccountModule,
-    EngineModule
+    EngineModule,
+    PendingTransactionsModule
   ],
   controllers: [RuneOrdersController, AccountController],
   providers: [],

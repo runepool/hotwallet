@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PendingTransactionsService } from './pending-transactions.service';
-import { PendingTransaction } from '../entities/pending-transaction';
+import { Transaction } from '../entities/transactions';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PendingTransaction])],
+  imports: [TypeOrmModule.forFeature([Transaction])],
   providers: [PendingTransactionsService],
   exports: [PendingTransactionsService],
 })

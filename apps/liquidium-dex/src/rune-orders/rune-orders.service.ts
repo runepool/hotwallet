@@ -45,7 +45,7 @@ export class RuneOrdersService {
       // await this.nostrService.publishOrder(order as any);
     }
 
-    return await this.dbService.createBatchOrders(await Promise.all(orders));
+    return await this.dbService.save(await Promise.all(orders));
   }
 
   async getOrders(asset?: string, status?: string): Promise<RuneOrder[]> {

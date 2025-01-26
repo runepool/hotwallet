@@ -20,11 +20,13 @@
     "test:e2e": "jest --config ./apps/liquidium-dex/test/jest-e2e.json"
   },
   "dependencies": {
+    "@bitcoinerlab/secp256k1": "^1.2.0",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/schedule": "^5.0.1",
     "@nestjs/swagger": "^11.0.3",
     "@nestjs/typeorm": "^11.0.0",
     "axios": "^1.7.9",
@@ -36,7 +38,6 @@
     "runelib": "^1.0.7",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
-    "@bitcoinerlab/secp256k1": "^1.2.0",
     "typeorm": "^0.3.20",
     "ws": "^8.18.0"
   },
