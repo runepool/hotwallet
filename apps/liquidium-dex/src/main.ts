@@ -15,6 +15,8 @@ async function bootstrap() {
     .setDescription('API documentation for the P2P Decentralized Exchange')
     .setVersion('1.0')
     .build();
+
+  app.enableCors();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 

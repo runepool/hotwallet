@@ -6,7 +6,7 @@ import { RunesService } from '@app/blockchain/runes/runes.service';
 
 import { OrderStatus, RuneOrder, RuneOrderType } from '@app/database/entities/rune-order';
 
-import { Transaction as Trade } from '@app/database/entities/transactions';
+import { Transaction as Trade, TransactionStatus } from '@app/database/entities/transactions';
 import { RuneOrdersService } from '@app/database/rune-orders/rune-orders.service';
 import { TransactionsDbService } from '@app/database/transactions/transactions.service';
 import { NostrService } from '@app/nostr';
@@ -16,10 +16,12 @@ import { Psbt, Transaction } from 'bitcoinjs-lib';
 import { Errors, OracleError } from 'libs/errors/errors';
 import { Event } from 'nostr-tools';
 import { Edict, none, RuneId, Runestone } from 'runelib';
-import { FillRuneOrderOffer, RuneFillRequest } from './types';
+import { FillRuneOrderOffer, RuneFillRequest, SwapMessage, SwapResult, SwapTransaction } from './types';
 
 export const PUB_EVENT = 69420;
 export const SUB_EVENT = 69421;
+export const DM = 4;
+
 
 @Injectable()
 export class RuneEngineService implements OnModuleInit {
@@ -34,16 +36,85 @@ export class RuneEngineService implements OnModuleInit {
     ) { }
 
     onModuleInit() {
-        this.nostrService.subscribeToEvents(SUB_EVENT, async (event: Event) => {
+        this.nostrService.subscribeToEvent([
+            { kinds: [SUB_EVENT], }
+        ], async (event: Event) => {
             try {
                 const fillOrderRequest = Object.assign(new RuneFillRequest(), JSON.parse(Buffer.from(event.content, 'base64').toString('utf-8')));
                 const result = await this.process(fillOrderRequest);
-                await this.nostrService.publishDirectMessage(JSON.stringify(result), event.pubkey);
+                await this.nostrService.publishDirectMessage(JSON.stringify(
+                    {
+                        type: 'prepare',
+                        data: result
+                    } as SwapMessage<FillRuneOrderOffer>
+                ), event.pubkey);
             } catch (error) {
                 console.log("Error", error);
                 // Logger.error("Could not decode nostr event")
             }
         })
+
+        this.nostrService.subscribeToEvent([
+            {
+                kinds: [DM],
+                '#p': [this.nostrService.publicKey],
+            }
+        ], async (event: Event) => {
+            try {
+                const swapData = this.nostrService.decryptEventContent(event);
+                const result = await this.finalize(JSON.parse(swapData));
+                await this.nostrService.publishDirectMessage(JSON.stringify({
+                    type: 'result',
+                    data: result
+                } as SwapMessage<SwapResult>
+                ), event.pubkey);
+
+            } catch (error) {
+                console.log("Error", error);
+
+                const result = {
+                    status: 'error',
+                    error: 'Could not finalize swap'
+                } as SwapResult
+
+                await this.nostrService.publishDirectMessage(JSON.stringify({
+                    type: 'result',
+                    data: result
+                } as SwapMessage<SwapResult>), event.pubkey);
+            }
+        })
+    }
+
+    async finalize(swap: SwapTransaction): Promise<SwapResult> {
+        const psbt = Psbt.fromBase64(swap.signedBase64Psbt);
+        const tx = psbt.extractTransaction();
+        const transaction = await this.transactionsDbService.findById(swap.offerId);
+
+        if (!transaction) {
+            throw "Transaction not found";
+        }
+
+        const txid = await this.bitcoinService.broadcast(tx.toHex());
+
+        transaction.status = TransactionStatus.CONFIRMING;
+        transaction.txid = txid;
+
+        try {
+            const orders = transaction.orders.split(",").map(async item => {
+                const [id, amount] = item.split(":");
+                const order = await this.orderService.getOrderById(id);
+                order.filledQuantity += BigInt(amount);
+                return order;
+            });
+
+            await this.orderService.save(await Promise.all(orders))
+            await this.transactionsDbService.create(transaction);
+        } catch (error) {
+            Logger.error("Could not update pending orders")
+        }
+
+        return { txid, status: 'success' };
+
     }
 
     async process(fillRequest: RuneFillRequest): Promise<FillRuneOrderOffer> {
@@ -75,10 +146,10 @@ export class RuneEngineService implements OnModuleInit {
             const availableOrderAmountInSats = Number(availableOrderAmount * order.price) / 10 ** runeInfo.decimals;
 
             if (availableOrderAmountInSats >= remainingFillAmount) {
-                runeAmount = BigInt(Math.ceil(Number(remainingFillAmount) / Number(order.price))) as bigint;
+                runeAmount = BigInt(Math.ceil(Number(remainingFillAmount) / Number(order.price)) * 10 ** runeInfo.decimals) as bigint;
                 order.filledQuantity = BigInt(order.filledQuantity)
                 order.filledQuantity += runeAmount;
-                selectedOrders.push({ order, usedAmount: remainingFillAmount });
+                selectedOrders.push({ order, usedAmount: runeAmount });
                 remainingFillAmount = 0n;
                 break;
             }
@@ -145,25 +216,26 @@ export class RuneEngineService implements OnModuleInit {
         const buyerInputsToSign: SignableInput[] = [];
         const { fee } = appendUnspentOutputsAsNetworkFee(swapPsbt, fundingOutputs, [], req.takerPaymentAddress, feeRate, buyerInputsToSign);
         const psbt = this.walletService.signPsbt(swapPsbt, sellerInputsToSign.map(item => item.index));
-
-        const pendingTx = new Trade();
-        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
-        pendingTx.txid = Transaction.fromBuffer(psbt.data.getTransaction()).getId();
-        pendingTx.amount = runeAmount.toString()
-
         // Prepare psbt
         const priceSum = selectedOrders.reduce((prev, curr) => prev += curr.order.price, 0n);
         const avgPrice = Number(priceSum) / selectedOrders.length;
-        pendingTx.price = avgPrice.toString();
-        await this.transactionsDbService.create(pendingTx);
-        await this.orderService.save(selectedOrders.map(item => item.order));
 
-        Logger.log(`Offer: Rune${runeAmount} | Sats: ${req.amount}`);
+        const pendingTx = new Trade();
+        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
+        pendingTx.amount = runeAmount.toString()
+        pendingTx.price = avgPrice.toString();
+        pendingTx.confirmations = 0;
+        pendingTx.rune = req.rune;
+        pendingTx.status = TransactionStatus.PENDING;
+
+        const { id } = await this.transactionsDbService.create(pendingTx);
+        Logger.log(`Offer: Rune${runeAmount} | Sats: ${req.amount} ${pendingTx.id}`);
         return {
             fee,
             psbtBase64: psbt.toBase64(),
             takerInputsToSign: buyerInputsToSign,
             provider: process.env['NAME'],
+            id
         }
     }
 
@@ -183,7 +255,11 @@ export class RuneEngineService implements OnModuleInit {
             const availableOrderAmountInSats = Number(availableOrderAmount * BigInt(order.price)) / 10 ** runeInfo.decimals;
 
             if (availableOrderAmount >= remainingFillAmount) {
-                quoteAmount = BigInt(Math.ceil(Number(remainingFillAmount) * Number(order.price)) / 10 ** runeInfo.decimals) as bigint;
+                let _quoteAmount = Math.floor(Number(remainingFillAmount) * Number(order.price)) / 10 ** runeInfo.decimals;
+                if(_quoteAmount < 1) {
+                    break;
+                }
+                quoteAmount = BigInt(_quoteAmount);
                 order.filledQuantity += remainingFillAmount;
                 selectedOrders.push({ order, usedAmount: remainingFillAmount });
                 remainingFillAmount = 0n;
@@ -195,6 +271,10 @@ export class RuneEngineService implements OnModuleInit {
             order.status = OrderStatus.CLOSED;
             quoteAmount += BigInt(availableOrderAmountInSats);
             selectedOrders.push({ order, usedAmount: availableOrderAmount });
+        }
+
+        if (quoteAmount <546) {
+            throw "Dust"
         }
 
         if (remainingFillAmount > 0) {
@@ -253,18 +333,21 @@ export class RuneEngineService implements OnModuleInit {
         const { fee } = appendUnspentOutputsAsNetworkFee(swapPsbt, fundingOutputs, [], this.walletService.address, feeRate, buyerInputsToSign);
         const psbt = this.walletService.signPsbt(swapPsbt, buyerInputsToSign.map(item => item.index));
 
-        const pendingTx = new Trade();
-        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
-        pendingTx.txid = Transaction.fromBuffer(psbt.data.getTransaction()).getId();
-        pendingTx.amount = req.amount.toString()
+
 
         // Prepare psbt
         const priceSum = selectedOrders.reduce((prev, curr) => prev += curr.order.price, 0n);
         const avgPrice = Number(priceSum) / selectedOrders.length;
-        pendingTx.price = avgPrice.toString();
-        await this.transactionsDbService.create(pendingTx);
-        await this.orderService.save(selectedOrders.map(item => item.order));
 
+        const pendingTx = new Trade();
+        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
+        pendingTx.amount = req.amount.toString()
+        pendingTx.price = avgPrice.toString();
+        pendingTx.confirmations = 0;
+        pendingTx.rune = req.rune;
+        pendingTx.status = TransactionStatus.PENDING;
+
+        const { id } = await this.transactionsDbService.create(pendingTx);
 
         Logger.log(`Offer: Rune${req.amount} | Sats: ${quoteAmount}`);
         return {
@@ -272,6 +355,7 @@ export class RuneEngineService implements OnModuleInit {
             psbtBase64: psbt.toBase64(),
             takerInputsToSign: sellerInputsToSign,
             provider: process.env['NAME'],
+            id
         }
     }
 

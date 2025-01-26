@@ -17,6 +17,23 @@ export class FillRuneOrderOffer {
     takerInputsToSign: SignableInput[];
     provider: string;
     fee: number;
+    id: string;
+}
+
+export class SwapTransaction {
+    signedBase64Psbt: string;
+    offerId: string;
+}
+
+export class SwapResult {
+    status: 'success' | 'error';
+    txid?: string;
+    error?: string;
+}
+
+export class SwapMessage<T> {
+    type: 'prepare' | 'result'
+    data: T
 }
 
 export class RuneFillRequest {

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CreateRuneOrderDto, CreateBatchRuneOrderDto } from '../dto/rune-orders.dto';
 import { RuneOrdersService } from './rune-orders.service';
@@ -37,5 +37,12 @@ export class RuneOrdersController {
   @ApiResponse({ status: 404, description: 'Order not found.' })
   async getOrderById(@Param('orderId') orderId: string) {
     return this.ordersService.getOrderById(orderId);
+  }
+
+  @Delete(':orderId')
+  @ApiOperation({ summary: 'Delete order by ID' })
+  @ApiResponse({ status: 200, description: 'Order deleted successfully.' })
+  async deleteOrderById(@Param('orderId') orderId: string) {
+    return this.ordersService.deleteOrder(orderId);
   }
 }

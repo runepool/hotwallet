@@ -5,7 +5,6 @@ import { RuneOrdersService } from '@app/database/rune-orders/rune-orders.service
 import { TransactionsDbService } from '@app/database/transactions/transactions.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Transaction } from 'bitcoinjs-lib';
 
 @Injectable()
 export class PendingTransactionsService {
@@ -25,24 +24,32 @@ export class PendingTransactionsService {
 
         const ordersToUpdate: Promise<RuneOrder>[] = [] as any;
         const transactionsToUpdate = [];
+        const transactionsToDelete: string[] = [];
         const currentBlock = await this.bitcoinService.getTipHeight();
         for (const transaction of pendingTransactions) {
+            // Give txs time to propagate
+            if (transaction.createdAt.getTime() > Date.now() - 30_000) continue;
             try {
-                const tx = await this.bitcoinService.getTxInfo(transaction.txid);
+                const tx = await this.bitcoinService.getTxInfo(transaction.txid).catch(err => null);
                 // Reset the order amounts
                 if (!tx || !tx.status) {
-                    const orders = transaction.orders.split(",").map(async item => {
-                        const [id, amount] = item.split(":");
-                        const order = await this.orderService.getOrderById(id);
-                        order.filledQuantity -= BigInt(amount);
-                        return order;
-                    });
-                    ordersToUpdate.push(...orders)
-                    transaction.status = TransactionStatus.ERRORED;
-                    transactionsToUpdate.push(transaction);
+                    if (transaction.status === TransactionStatus.CONFIRMING) {
+                        const orders = transaction.orders.split(",").map(async item => {
+                            const [id, amount] = item.split(":");
+                            const order = await this.orderService.getOrderById(id);
+                            order.filledQuantity -= BigInt(amount);
+                            return order;
+                        });
+                        ordersToUpdate.push(...orders)
+                        transaction.status = TransactionStatus.ERRORED;
+                        transactionsToUpdate.push(transaction);
+                    } else {
+                        transactionsToDelete.push(transaction.id);
+                    }
                     continue;
                 }
-                transaction.confirmations = currentBlock - tx.status.block_height;
+
+                transaction.confirmations = tx.status.block_height ? currentBlock - tx.status.block_height + 1 : 0;
                 transaction.status = TransactionStatus.CONFIRMING;
                 if (transaction.confirmations >= 4) {
                     transaction.status = TransactionStatus.CONFIRMED;
@@ -50,15 +57,25 @@ export class PendingTransactionsService {
 
                 transactionsToUpdate.push(transaction);
             } catch (error) {
+                transactionsToDelete.push(transaction.id);
                 Logger.error(`Error processing transaction ${transaction.id}: ${error.message}`);
             }
         }
 
         try {
-            await this.orderService.save(await Promise.all(ordersToUpdate));
-            await this.service.save(transactionsToUpdate);
+            const orders = await Promise.all(ordersToUpdate);
+            if (orders.length > 0) {
+                await this.orderService.save(orders);
+            }
+            if (transactionsToUpdate.length > 0) {
+                await this.service.save(transactionsToUpdate);
+            }
+
+            if (transactionsToDelete.length > 0) {
+                await this.service.deleteBatch(transactionsToDelete)
+            }
         } catch (error) {
-            Logger.error(`Error updating transactions ${error.message}`);
+            Logger.error(`Error updating transactions ${error}`);
         }
     }
 

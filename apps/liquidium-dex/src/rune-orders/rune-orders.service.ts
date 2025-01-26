@@ -1,14 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { CreateRuneOrderDto, CreateBatchRuneOrderDto } from '../dto/rune-orders.dto';
+import { RunesService } from '@app/blockchain/runes/runes.service';
 import { RuneOrder } from '@app/database/entities/rune-order';
 import { RuneOrdersService as PersistenceService } from '@app/database/rune-orders/rune-orders.service';
-import { NostrService } from '@app/nostr';
-import { RunesService } from '@app/blockchain/runes/runes.service';
+import { Injectable } from '@nestjs/common';
+import { CreateBatchRuneOrderDto, CreateRuneOrderDto } from '../dto/rune-orders.dto';
 
 @Injectable()
 export class RuneOrdersService {
   constructor(
-    private readonly nostrService: NostrService,
     private readonly runeService: RunesService,
     private readonly dbService: PersistenceService) { }
 

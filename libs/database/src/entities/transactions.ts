@@ -13,6 +13,9 @@ export class Transaction {
   id: string;
 
   @Column()
+  rune: string;
+
+  @Column({ nullable: true })
   txid: string;
 
   @Column()
@@ -24,7 +27,7 @@ export class Transaction {
   @Column()
   price: string;
 
-  @Column()
+  @Column({ default: 0 })
   confirmations: number
 
   @Column({ default: 'pending' })

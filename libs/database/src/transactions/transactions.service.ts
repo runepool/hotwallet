@@ -27,8 +27,19 @@ export class TransactionsDbService {
         return await this.transactionRepository.findOneBy({ id });
     }
 
+    async findByTxid(id: string): Promise<Transaction | null> {
+        return await this.transactionRepository.findOneBy({ id });
+    }
+
+
     async delete(id: string): Promise<void> {
-        await this.transactionRepository.delete(id);
+        await this.transactionRepository.delete({
+            id
+        });
+    }
+
+    async deleteBatch(ids: string[]): Promise<void> {
+        await this.transactionRepository.delete(ids);
     }
 
     /**
@@ -38,6 +49,17 @@ export class TransactionsDbService {
         return await this.transactionRepository
             .createQueryBuilder('transaction')
             .where('transaction.status = :pending', { pending: 'pending' })
+            .orWhere('transaction.status = :confirming', { confirming: 'confirming' })
+            .getMany();
+    }
+
+
+    /**
+     * Fetch all transactions with status 'pending' or 'confirming' using query builder.
+     */
+    async findConfirming(): Promise<Transaction[]> {
+        return await this.transactionRepository
+            .createQueryBuilder('transaction')
             .orWhere('transaction.status = :confirming', { confirming: 'confirming' })
             .getMany();
     }

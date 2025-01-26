@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { PendingTransactionsService } from './pending-transactions.service';
+
 import { Transaction } from '../entities/transactions';
+import { PendingTransactionsService } from 'apps/liquidium-dex/src/pending-transactions/pending-transactions.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Transaction])],
