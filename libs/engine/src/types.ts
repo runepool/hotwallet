@@ -20,8 +20,10 @@ export class FillRuneOrderOffer {
 }
 
 export class RuneFillRequest {
-    takerAddress: string;
-    takePublicKey: string;
+    takerPaymentAddress: string;
+    takerPaymentPublicKey: string;
+    takerRuneAddress: string;
+    takerRunePublicKey: string;
     side: 'buy' | 'sell';
     amount: bigint;
     rune: string;

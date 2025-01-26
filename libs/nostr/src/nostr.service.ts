@@ -9,8 +9,7 @@ import * as WebSocket from 'ws';
 @Injectable()
 export class NostrService {
     private readonly relayUrls = [
-        'wss://relay.damus.io',
-        'wss://relay.nostr.band'
+        'wss://relay.runepool.org',
     ];
     private privateKey: Uint8Array;
     private publicKey: string;
@@ -47,19 +46,20 @@ export class NostrService {
     }
 
     async subscribeToEvents(kind: number, callback: any): Promise<void> {
-        const h = this.pool.subscribeMany(this.relayUrls, [
-            { kinds: [kind], }
-        ], {
-            onevent: (event: Event) => {
-                if (event.created_at * 1000 >= Date.now() - 5000) {
-                    callback(event);
+        const connect = () =>
+            this.pool.subscribeMany(this.relayUrls, [
+                { kinds: [kind], }
+            ], {
+                onevent: (event: Event) => {
+                    if (event.created_at * 1000 >= Date.now() - 5000) {
+                        callback(event);
+                    }
+                },
+                onclose() {
+                    connect();
                 }
-            },
-            oneose() {
-                console.log("Closing");
-
-            }
-        })
+            })
+        connect()
     }
 
     async publishDirectMessage(content: string, receiverPublicKey: string): Promise<void> {

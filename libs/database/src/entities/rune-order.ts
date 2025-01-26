@@ -12,6 +12,15 @@ export enum OrderStatus {
 }
 
 
+const BigIntTransformer = {
+  from: (value: string) => {
+    return BigInt(value || 0);
+  },
+  to: (value: bigint) => {
+    return value && value.toString();
+  },
+};
+
 @Entity()
 export class RuneOrder {
   @PrimaryGeneratedColumn('uuid')
@@ -20,13 +29,22 @@ export class RuneOrder {
   @Column()
   rune: string;
 
-  @Column('bigint')
+  @Column('bigint', {
+    default: 0n,
+    transformer: BigIntTransformer
+  })
   quantity: bigint;
 
-  @Column('bigint', { default: 0n })
+  @Column('bigint', {
+    default: 0n,
+    transformer: BigIntTransformer
+  })
   filledQuantity: bigint;
 
-  @Column('bigint')
+  @Column('bigint', {
+    default: 0n,
+    transformer: BigIntTransformer
+  })
   price: bigint;
 
   @Column({ default: 'open' })

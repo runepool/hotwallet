@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeepPartial, Repository } from 'typeorm';
-import { RuneOrder } from '../entities/rune-order';
+import { RuneOrder, RuneOrderType } from '../entities/rune-order';
 
 @Injectable()
 export class RuneOrdersService {
@@ -18,7 +18,7 @@ export class RuneOrdersService {
         return await this.runeOrderRepository.save(batchData);
     }
 
-    async getOrders(asset?: string, status?: string): Promise<RuneOrder[]> {
+    async getOrders(asset?: string, status?: string, type?: RuneOrderType): Promise<RuneOrder[]> {
         const query = this.runeOrderRepository.createQueryBuilder('order');
 
         if (asset) {
@@ -29,8 +29,12 @@ export class RuneOrdersService {
             query.andWhere('order.status = :status', { status });
         }
 
+        if (type) {
+            query.andWhere('order.type = :type', { type });
+        }
+
         query.orderBy({
-            'price': 'ASC'
+            'price': type === 'bid' ? 'ASC' : 'DESC'
         })
 
         return await query.getMany();
