@@ -9,6 +9,8 @@ import { PendingTransactionsModule } from './pending-transactions/pending-transa
 import { RuneOrdersController } from './rune-orders/rune-orders.controller';
 import { RuneOrdersModule } from "./rune-orders/rune-orders.module";
 import { ScheduleModule } from '@nestjs/schedule';
+import { SettingsController } from './settings/settings.controller';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -18,9 +20,10 @@ import { ScheduleModule } from '@nestjs/schedule';
     AccountModule,
     EngineModule,
     PendingTransactionsModule,
-    TransactionsDbModule
+    TransactionsDbModule,
+    SettingsModule
   ],
-  controllers: [RuneOrdersController, AccountController, PendingTransactionController],
+  controllers: [RuneOrdersController, AccountController, PendingTransactionController, SettingsController],
   providers: [],
 })
 export class AppModule { }

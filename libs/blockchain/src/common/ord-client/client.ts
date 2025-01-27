@@ -1,18 +1,28 @@
 import { HttpService } from '@nestjs/axios';
-import { Injectable } from '@nestjs/common';
-
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { OrdOutput, RuneInfo } from './types';
 import { lastValueFrom } from 'rxjs';
-
-
+import { DatabaseSettingsService } from '@app/database/settings/settings.service';
 
 @Injectable()
-export class OrdClient {
-  endpoint: string;
+export class OrdClient implements OnModuleInit {
+  private endpoint: string;
+
   constructor(
     private http: HttpService,
-  ) {
-    this.endpoint = process.env['ORD_URL'];
+    private readonly settingsService: DatabaseSettingsService,
+  ) {}
+
+  async onModuleInit() {
+    await this.updateEndpoint();
+  }
+
+  async updateEndpoint() {
+    const settings = await this.settingsService.getSettings();
+    this.endpoint = settings.ordUrl;
+    if (!this.endpoint) {
+      throw new Error('ORD URL not set in settings');
+    }
   }
 
   async blockheight(): Promise<number> {

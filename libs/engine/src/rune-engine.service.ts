@@ -168,7 +168,12 @@ export class RuneEngineService implements OnModuleInit {
         const runeId = new RuneId(+runeInfo.rune_id.split(":")[0], +runeInfo.rune_id.split(":")[1]);
 
         // Get the collateral unspent outputs
-        const runeOutputs = await this.runeService.getRunesUnspentOutputs(this.walletService.address, runeInfo.rune_id, this.walletService.publicKey);
+        const runeOutputs = await this.runeService.getRunesUnspentOutputs(
+            await this.walletService.getAddress(),
+            runeInfo.rune_id,
+            await this.walletService.getPublicKey()
+        );
+
         if (!runeOutputs || runeOutputs.length === 0) {
             throw new OracleError(Errors.NO_RUNE_OUTPUTS_AVAILABLE);
         }
@@ -195,7 +200,7 @@ export class RuneEngineService implements OnModuleInit {
 
         if (hasRuneChange) {
             swapPsbt.addOutput({
-                address: this.walletService.address,
+                address: await this.walletService.getAddress(),
                 value: 546
             });
         };
@@ -206,7 +211,7 @@ export class RuneEngineService implements OnModuleInit {
         });
 
         swapPsbt.addOutput({
-            address: this.walletService.address,
+            address: await this.walletService.getAddress(),
             value: Number(req.amount)
         });
 
@@ -234,7 +239,7 @@ export class RuneEngineService implements OnModuleInit {
             fee,
             psbtBase64: psbt.toBase64(),
             takerInputsToSign: buyerInputsToSign,
-            provider: process.env['NAME'],
+            provider: await this.walletService.getPublicKey(),
             id
         }
     }
@@ -256,7 +261,7 @@ export class RuneEngineService implements OnModuleInit {
 
             if (availableOrderAmount >= remainingFillAmount) {
                 let _quoteAmount = Math.floor(Number(remainingFillAmount) * Number(order.price)) / 10 ** runeInfo.decimals;
-                if(_quoteAmount < 1) {
+                if (_quoteAmount < 1) {
                     break;
                 }
                 quoteAmount = BigInt(_quoteAmount);
@@ -273,7 +278,7 @@ export class RuneEngineService implements OnModuleInit {
             selectedOrders.push({ order, usedAmount: availableOrderAmount });
         }
 
-        if (quoteAmount <546) {
+        if (quoteAmount < 546) {
             throw "Dust"
         }
 
@@ -317,7 +322,7 @@ export class RuneEngineService implements OnModuleInit {
         };
 
         swapPsbt.addOutput({
-            address: this.walletService.address,
+            address: await this.walletService.getAddress(),
             value: 546
         });
 
@@ -327,10 +332,17 @@ export class RuneEngineService implements OnModuleInit {
         });
 
         // Get funding unspent outputs
-        const fundingOutputs = await this.blockchainService.getValidFundingInputs(this.walletService.address, this.walletService.publicKey);
+        const fundingOutputs = await this.blockchainService.getValidFundingInputs(
+            await this.walletService.getAddress(),
+            await this.walletService.getPublicKey()
+        );
         const feeRate = await this.bitcoinService.getFeeRate();
         const buyerInputsToSign: SignableInput[] = [];
-        const { fee } = appendUnspentOutputsAsNetworkFee(swapPsbt, fundingOutputs, [], this.walletService.address, feeRate, buyerInputsToSign);
+        const { fee } = appendUnspentOutputsAsNetworkFee(swapPsbt, fundingOutputs, [],
+            await this.walletService.getAddress(),
+            feeRate,
+            buyerInputsToSign
+        );
         const psbt = this.walletService.signPsbt(swapPsbt, buyerInputsToSign.map(item => item.index));
 
 
@@ -354,7 +366,7 @@ export class RuneEngineService implements OnModuleInit {
             fee,
             psbtBase64: psbt.toBase64(),
             takerInputsToSign: sellerInputsToSign,
-            provider: process.env['NAME'],
+            provider: await this.walletService.getPublicKey(),
             id
         }
     }

@@ -5,6 +5,7 @@ import * as ecc from '@bitcoinerlab/secp256k1';
 import * as dotenv from 'dotenv';
 import { toXOnly } from "bitcoinjs-lib/src/psbt/bip371";
 import { tweakSigner } from '@app/blockchain/bitcoin/utils';
+import { DatabaseSettingsService } from '@app/database/settings/settings.service';
 
 dotenv.config();
 
@@ -12,29 +13,38 @@ bitcoin.initEccLib(ecc);
 const ECPair = ECPairFactory(ecc);
 
 @Injectable()
-export class BitcoinWalletService implements OnModuleInit {
-    private readonly privateKey: string;
+export class BitcoinWalletService {
     public readonly network: bitcoin.Network;
-    private signer: ECPairInterface;
+    private _privateKey: string;
+    private _signer: ECPairInterface;
+    private _address: string;
+    private _publicKey: string;
 
-    public address: string;
-    public publicKey: string;
 
-    constructor() {
-        this.privateKey = process.env.BITCOIN_PRIVATE_KEY || '';
-        if (!this.privateKey) {
-            throw new Error('Bitcoin private key not set in environment variables.');
-        }
-
+    constructor(private readonly settingsService: DatabaseSettingsService) {
         const networkType = process.env.BITCOIN_NETWORK || 'mainnet';
         this.network = networkType === 'testnet' ? bitcoin.networks.testnet : bitcoin.networks.bitcoin;
     }
 
-    onModuleInit() {
+    reset() {
+        this._privateKey = undefined;
+        this._signer = undefined;
+        this._address = undefined;
+        this._publicKey = undefined;
+    }
+
+    async init() {
         try {
-            this.signer = this.importWalletFromPrivateKey(this.privateKey);
-            this.publicKey = toXOnly(this.signer.publicKey).toString("hex");
-            this.address = this.generateP2TRAddress().address;
+            const settings = await this.settingsService.getSettings();
+            this._privateKey = settings.bitcoinPrivateKey;
+
+            if (!this._privateKey) {
+                throw new Error('Bitcoin private key not set in settings.');
+            }
+
+            this._signer = this.importWalletFromPrivateKey(this._privateKey);
+            this._publicKey = toXOnly(this._signer.publicKey).toString("hex");
+            this._address = this.generateP2TRAddress().address;
             console.log('Bitcoin wallet initialized:', this.generateP2TRAddress().address);
         } catch (error) {
             console.error('Failed to initialize Bitcoin wallet:', error.message);
@@ -43,7 +53,7 @@ export class BitcoinWalletService implements OnModuleInit {
 
     signPsbt(psbt: bitcoin.Psbt, inputs: number[]) {
         inputs.forEach(input => {
-            psbt.signInput(input, tweakSigner(this.signer));
+            psbt.signInput(input, tweakSigner(this._signer));
         })
 
         return psbt;
@@ -61,7 +71,7 @@ export class BitcoinWalletService implements OnModuleInit {
 
     private generateP2TRAddress(): { address: string; type: string } {
         try {
-            const keyPair = this.signer;
+            const keyPair = this._signer;
             const { address } = bitcoin.payments.p2tr({ internalPubkey: toXOnly(keyPair.publicKey), network: this.network });
             if (!address) {
                 throw new Error('Failed to generate P2TR address.');
@@ -71,4 +81,19 @@ export class BitcoinWalletService implements OnModuleInit {
             throw new Error(`Error generating P2TR address: ${error.message}`);
         }
     }
+
+    public async getAddress(): Promise<string> {
+        if (!this._signer) {
+            await this.init();
+        }
+        return this._address;
+    }
+
+    public async getPublicKey(): Promise<string> {
+        if (!this._signer) {
+            await this.init();
+        }
+        return this._publicKey;
+    }
+
 }

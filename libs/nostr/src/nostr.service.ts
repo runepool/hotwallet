@@ -1,31 +1,38 @@
 import { RuneOrder } from '@app/database/entities/rune-order';
 import { PUB_EVENT } from '@app/engine';
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Event, finalizeEvent, getPublicKey, SimplePool } from 'nostr-tools';
-
-
 import * as WebSocket from 'ws';
 import { createDecipheriv } from 'crypto';
 import { pointMultiply } from '@bitcoinerlab/secp256k1';
-
 import * as secp from "@noble/curves/secp256k1";
-
+import { DatabaseSettingsService } from '@app/database/settings/settings.service';
 
 @Injectable()
-export class NostrService {
+export class NostrService implements OnModuleInit {
     private readonly relayUrls = [
         'wss://relay.runepool.org',
     ];
     private privateKey: Uint8Array;
     public publicKey: string;
-    private pool: SimplePool
+    private pool: SimplePool;
 
-    constructor() {
-        this.privateKey = Uint8Array.from(Buffer.from(process.env["NOSTR_KEY"], 'hex'));
-        this.publicKey = getPublicKey(this.privateKey);
+    constructor(private readonly settingsService: DatabaseSettingsService) {
         this.pool = new SimplePool();
         this.pool["_WebSocket"] = WebSocket;
+    }
 
+    async onModuleInit() {
+        await this.updateKeys();
+    }
+
+    async updateKeys() {
+        const settings = await this.settingsService.getSettings();
+        if (!settings.nostrPrivateKey) {
+            return;
+        }
+        this.privateKey = Uint8Array.from(Buffer.from(settings.nostrPrivateKey, 'hex'));
+        this.publicKey = getPublicKey(this.privateKey);
         console.log('Nostr public key:', this.publicKey);
     }
 
