@@ -1,11 +1,10 @@
-import { PsbtInput, PsbtInputExtended, PsbtOutputExtended } from "bip174/src/lib/interfaces";
+  import { PsbtInputExtended, PsbtOutputExtended } from "bip174/src/lib/interfaces";
 import { Network, Psbt, initEccLib } from "bitcoinjs-lib";
 import { fromOutputScript } from "bitcoinjs-lib/src/address";
 import { taggedHash } from "bitcoinjs-lib/src/crypto";
-import { witnessStackToScriptWitness } from "bitcoinjs-lib/src/psbt/psbtutils";
 
-import ECPairFactory, { ECPairInterface } from "ecpair";
 import * as ecc from "@bitcoinerlab/secp256k1";
+import ECPairFactory, { ECPairInterface } from "ecpair";
 
 import { p2sh } from "bitcoinjs-lib/src/payments";
 initEccLib(ecc);

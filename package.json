@@ -54,6 +54,7 @@
     "axios": "^1.7.9",
     "better-sqlite3": "^11.8.1",
     "bitcoinjs-lib": "^6.1.7",
+    "decimal.js": "^10.5.0",
     "ecpair": "^2.1.0",
     "nostr-tools": "^2.10.4",
     "reflect-metadata": "^0.1.13",
@@ -64,7 +65,6 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "electron": "^34.0.1",
     "@nestjs/cli": "^10.0.0",
     "@nestjs/schematics": "^10.0.0",
     "@nestjs/testing": "^10.0.0",
@@ -75,6 +75,7 @@
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "commander": "^13.1.0",
+    "electron": "^34.0.1",
     "electron-builder": "^25.1.8",
     "eslint": "^8.42.0",
     "eslint-config-prettier": "^9.0.0",
