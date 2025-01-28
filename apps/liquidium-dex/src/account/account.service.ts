@@ -1,6 +1,6 @@
 import { OrdClient } from '@app/blockchain/common/ord-client/client';
 import { BitcoinWalletService } from '@app/wallet';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 
 @Injectable()
@@ -23,33 +23,24 @@ export class AccountService {
         return [btcBalance];
       }
 
-      btcBalance.address = address;
       const utxos = await this.ordService.address(address);
-      const outputs = await this.ordService.outputBatch(utxos);
-
+      btcBalance.address = address;
+      btcBalance.balance = utxos.satBalance / 1e8;
       const runeBalances = {}
-      for (const output of outputs) {
-        btcBalance.balance += output.value;
-        for (const [rune, amount] of Object.entries(output.runes)) {
-          if (!runeBalances[rune]) {
-            runeBalances[rune] = {
-              address,
-              balance: amount.amount,
-              token: rune,
-              decimals: amount.divisibility
-            }
-            continue;
-          }
-
-          runeBalances[rune].balance += amount.amount
+      utxos.runeBalances.forEach(runeBalance => {
+        runeBalances[runeBalance.name] = {
+          address,
+          balance: runeBalance.amount,
+          token: runeBalance.name,
         }
-      }
-
+      });
+    
       const result = [btcBalance];
       result.push(...Object.values(runeBalances) as any);
       return result;
     }
     catch (error) {
+      Logger.error(error);
       return [btcBalance];
     }
   }

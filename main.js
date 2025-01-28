@@ -35,8 +35,9 @@ app.on('ready', () => {
 
     // Load React app's built frontend
     const frontendPath = path.join(__dirname, 'webapp/dist/index.html'); // Path to React build output
-    mainWindow.loadFile(frontendPath);
-    mainWindow.webContents.openDevTools();
+    setTimeout(() => {
+      mainWindow.loadFile(frontendPath);
+    }, 3000);
     mainWindow.on('closed', () => {
       mainWindow = null;
     });

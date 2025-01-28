@@ -4,6 +4,26 @@ import { OrdOutput, RuneInfo } from './types';
 import { lastValueFrom } from 'rxjs';
 import { DatabaseSettingsService } from '@app/database/settings/settings.service';
 
+interface RuneBalance {
+  name: string;
+  amount: string;
+  emoji: string;
+}
+
+interface AddressResponse {
+  outputs: string[];
+  inscriptions: string[];
+  sat_balance: number;
+  runes_balances: [string, string, string][];
+}
+
+interface ParsedAddressResponse {
+  outputs: string[];
+  inscriptions: string[];
+  satBalance: number;
+  runeBalances: RuneBalance[];
+}
+
 @Injectable()
 export class OrdClient implements OnModuleInit {
   private endpoint: string;
@@ -78,16 +98,27 @@ export class OrdClient implements OnModuleInit {
   }
 
   /**
-   * Returns an array of unspent outputs with inscriptions
+   * Returns the address details including unspent outputs, inscriptions, and rune balances
+   * @param address Bitcoin address to query
+   * @returns Parsed address response containing outputs, inscriptions, sat balance and rune balances
    */
-  async address(address: string): Promise<string[]> {
+  async address(address: string): Promise<ParsedAddressResponse> {
     return lastValueFrom(
-      this.http.get<string[]>(`${this.endpoint}/address/${address}`, {
+      this.http.get<AddressResponse>(`${this.endpoint}/address/${address}`, {
         headers: {
           Accept: 'application/json'
         }
       })
-    ).then((r) => r.data);
+    ).then((response) => ({
+      outputs: response.data.outputs,
+      inscriptions: response.data.inscriptions,
+      satBalance: response.data.sat_balance,
+      runeBalances: response.data.runes_balances.map(([name, amount, emoji]) => ({
+        name,
+        amount,
+        emoji
+      }))
+    }));
   }
 
   /**

@@ -91,7 +91,7 @@ export class OrdInscriptionProvider implements InscriptionProviderInterface {
    */
   async addressOutputs(address: string): Promise<WithHeight<RuneOutput[]>> {
     const utxos = await this.ord.address(address);
-    return await this.runeOutputBatch(utxos);
+    return await this.runeOutputBatch(utxos.outputs);
   }
 
   async tickerInfo(runeId: string): Promise<RuneInfo> {

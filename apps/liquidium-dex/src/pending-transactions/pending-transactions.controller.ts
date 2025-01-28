@@ -18,7 +18,7 @@ export class PendingTransactionController {
     // Fetch all pending transactions
     @Get()
     async fetchAll(): Promise<Transaction[]> {
-        return this.service.findConfirming();
+        return this.service.findAll();
     }
 
     // Fetch a single transaction by ID
