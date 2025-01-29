@@ -11,6 +11,11 @@ app.on('ready', () => {
   const mode = process.env.APP_MODE || 'desktop';
   process.env.BITCOIN_NETWORK = process.env.BITCOIN_NETWORK || 'mainnet';
 
+  // Set up database path in user data directory
+  const userDataPath = app.getPath('userData');
+  const dbPath = path.join(userDataPath, 'exchange.db');
+  process.env.DATABASE_NAME = dbPath;
+
   // Start the NestJS server with SQLite support
   const serverPath = path.join(__dirname, 'dist/apps/liquidium-dex/main.js'); // Path to NestJS compiled file
   const frontendPort = process.env.FRONTEND_PORT || 4000; // Default port for frontend
@@ -61,7 +66,7 @@ app.on('ready', () => {
 });
 
 app.on('window-all-closed', () => {
-  if (serverProcess) serverProcess.kill(); // Ensure server stops with Electron
+  if (serverProcess) serverProcess.kill('SIGINT'); // Ensure server stops with Electron
   if (process.platform !== 'darwin') app.quit();
 });
 

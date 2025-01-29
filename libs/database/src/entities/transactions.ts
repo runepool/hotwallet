@@ -7,6 +7,12 @@ export enum TransactionStatus {
   ERRORED = 'errored'
 }
 
+export enum TransactionType {
+  BUY = 'buy',
+  SELL = 'sell'
+}
+
+
 @Entity()
 export class Transaction {
   @PrimaryGeneratedColumn('uuid')
@@ -20,6 +26,9 @@ export class Transaction {
 
   @Column()
   orders: string;
+
+  @Column()
+  type: string;
 
   @Column()
   amount: string;

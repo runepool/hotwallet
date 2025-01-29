@@ -7,7 +7,7 @@ import { TransactionsDbModule } from './transactions/pending-transactions.module
   imports: [
     TypeOrmModule.forRoot({
       type: 'better-sqlite3' as any,
-      database: 'exchange.db',
+      database: process.env.DATABASE_NAME || 'exchange.db',
       entities: [__dirname + '/entities/**/*.{.ts,.js}'],
       autoLoadEntities: true,
       synchronize: true, // Auto-create tables in dev; disable in production
@@ -18,4 +18,3 @@ import { TransactionsDbModule } from './transactions/pending-transactions.module
   exports: [RuneOrdersModule, TransactionsDbModule],
 })
 export class DatabaseModule { }
-

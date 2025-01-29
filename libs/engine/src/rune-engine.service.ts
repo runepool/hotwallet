@@ -6,7 +6,7 @@ import { RunesService } from '@app/blockchain/runes/runes.service';
 
 import { OrderStatus, RuneOrder, RuneOrderType } from '@app/database/entities/rune-order';
 
-import { Transaction as Trade, TransactionStatus } from '@app/database/entities/transactions';
+import { Transaction as Trade, TransactionStatus, TransactionType } from '@app/database/entities/transactions';
 import { RuneOrdersService } from '@app/database/rune-orders/rune-orders.service';
 import { TransactionsDbService } from '@app/database/transactions/transactions.service';
 import { NostrService } from '@app/nostr';
@@ -67,6 +67,8 @@ export class RuneEngineService implements OnModuleInit {
             try {
                 const swapData = this.nostrService.decryptEventContent(event);
                 const result = await this.finalize(JSON.parse(swapData));
+                
+                Logger.log("Finalized swap:", result);
                 await this.nostrService.publishDirectMessage(JSON.stringify({
                     type: 'result',
                     data: result
@@ -98,7 +100,7 @@ export class RuneEngineService implements OnModuleInit {
             throw "Transaction not found";
         }
 
-        const txid = await this.bitcoinService.broadcast(tx.toHex());
+        const txid = "4c27a6633c5f7b75eeb11533cc068df53513769c7237efe60b45acb0a957a40c"; //await this.bitcoinService.broadcast(tx.toHex());
 
         transaction.status = TransactionStatus.CONFIRMING;
         transaction.txid = txid;
@@ -183,7 +185,7 @@ export class RuneEngineService implements OnModuleInit {
         }
 
         const selectedOutputs: UnspentOutput[] = [];
-        const { hasRuneChange } = await this.selectRuneOutputs(runeOutputs, runeInfo.rune_id, req.amount, selectedOutputs);
+        const { hasRuneChange, totalRuneAmount } = await this.selectRuneOutputs(runeOutputs, runeInfo.rune_id, runeAmount, selectedOutputs);
 
         let receiverOutpoint = hasRuneChange ? 2 : 1;
 
@@ -264,6 +266,7 @@ export class RuneEngineService implements OnModuleInit {
         pendingTx.confirmations = 0;
         pendingTx.rune = req.rune;
         pendingTx.status = TransactionStatus.PENDING;
+        pendingTx.type = TransactionType.SELL;
 
         const { id } = await this.transactionsDbService.create(pendingTx);
         Logger.log(`Offer: Rune${runeAmount} | Sats: ${req.amount}`);
@@ -403,6 +406,7 @@ export class RuneEngineService implements OnModuleInit {
         pendingTx.confirmations = 0;
         pendingTx.rune = req.rune;
         pendingTx.status = TransactionStatus.PENDING;
+        pendingTx.type = TransactionType.BUY;
 
         const { id } = await this.transactionsDbService.create(pendingTx);
 
