@@ -100,7 +100,7 @@ export class RuneEngineService implements OnModuleInit {
             throw "Transaction not found";
         }
 
-        const txid = "4c27a6633c5f7b75eeb11533cc068df53513769c7237efe60b45acb0a957a40c"; //await this.bitcoinService.broadcast(tx.toHex());
+        const txid = await this.bitcoinService.broadcast(tx.toHex());
 
         transaction.status = TransactionStatus.CONFIRMING;
         transaction.txid = txid;
