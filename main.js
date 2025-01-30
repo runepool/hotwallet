@@ -20,7 +20,7 @@ app.on('ready', () => {
   const serverPath = path.join(__dirname, 'dist/apps/liquidium-dex/main.js'); // Path to NestJS compiled file
   const frontendPort = process.env.FRONTEND_PORT || 4000; // Default port for frontend
 
-  serverProcess = fork(serverPath)
+  serverProcess = fork(serverPath, { detached: false })
 
   // Log server output
   serverProcess.on('message', (message) => console.log('Server:', message));
@@ -66,9 +66,17 @@ app.on('ready', () => {
 });
 
 app.on('window-all-closed', () => {
+  console.log('Window all closed');
   if (serverProcess) serverProcess.kill('SIGINT'); // Ensure server stops with Electron
   if (process.platform !== 'darwin') app.quit();
 });
+
+
+app.on('before-quit', () => {
+  console.log('Window all closed');
+  if (serverProcess) serverProcess.kill('SIGINT'); // Ensure server stops with Electron
+});
+
 
 app.on('activate', () => {
   if (mainWindow === null && process.env.APP_MODE === 'desktop') {

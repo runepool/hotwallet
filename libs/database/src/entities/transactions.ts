@@ -9,7 +9,8 @@ export enum TransactionStatus {
 
 export enum TransactionType {
   BUY = 'buy',
-  SELL = 'sell'
+  SELL = 'sell',
+  SPLIT = 'split'
 }
 
 

@@ -24,8 +24,8 @@ export class BitcoinService {
   network: Network;
   url =
     process.env.BITCOIN_NETWORK !== 'mainnet'
-      ? `https://liquidium.mempool.space/${process.env.BITCOIN_NETWORK}/api`
-      : `https://liquidium.mempool.space/api`;
+      ? `https://mempool.space/${process.env.BITCOIN_NETWORK}/api`
+      : `https://mempool.space/api`;
 
   constructor(private http: HttpService) {
     this.network = networks[process.env['BITCOIN_NETWORK']]

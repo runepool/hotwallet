@@ -55,6 +55,7 @@
     "axios": "^1.7.9",
     "better-sqlite3": "^11.8.1",
     "bitcoinjs-lib": "^6.1.7",
+    "class-validator": "^0.14.1",
     "decimal.js": "^10.5.0",
     "ecpair": "^2.1.0",
     "nostr-tools": "^2.10.4",

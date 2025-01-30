@@ -3,9 +3,11 @@ import { DatabaseModule } from '@app/database';
 import { WalletModule } from '@app/wallet';
 import { Module } from '@nestjs/common';
 import { AccountService } from './account.service';
+import { BlockchainModule } from '@app/blockchain';
+import { RunesModule } from '@app/blockchain/runes/runes.module';
 
 @Module({
-  imports: [WalletModule, DatabaseModule,  OrdClientModule],
+  imports: [WalletModule, DatabaseModule, RunesModule, OrdClientModule, BlockchainModule],
   providers: [AccountService],
   exports: [AccountService],
 

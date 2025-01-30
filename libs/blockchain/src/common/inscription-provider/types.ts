@@ -5,6 +5,8 @@ export type OrdOutput = {
   address: string;
   transaction: string;
   sat_ranges: number[][];
+  spent?: boolean;
+  outpoint?: string;
   inscriptions: string[];
   runes: Record<string, OrdOutputRuneAmount>;
 };

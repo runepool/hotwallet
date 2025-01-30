@@ -204,7 +204,9 @@ export class BestinslotInscriptionProvider implements InscriptionProviderInterfa
       transaction: output.utxo.split(':')[0],
       sat_ranges: [],
       inscriptions: [output.inscription_id],
-      runes: {}
+      runes: {},
+      spent: false,
+      outpoint: output.utxo
     } satisfies OrdOutput;
   }
 
