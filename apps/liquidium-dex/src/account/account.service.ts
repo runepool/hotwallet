@@ -120,9 +120,10 @@ export class AccountService {
     outputInfo: OrdOutput[]
   ): Promise<Psbt> {
     const btcOutputs = outputInfo.filter(output => {
-      return Object.keys(output.runes).length == 0;
+      return Object.keys(output.runes).length == 0 && output.inscriptions.length == 0;
     });
 
+    const feeRate = await this.bitcoinService.getFeeRate();
     const psbt = new Psbt({ network: this.bitcoinService.network });
 
     if (assetName !== 'BTC') {
@@ -184,7 +185,9 @@ export class AccountService {
         throw new Error(`Not enough ${assetName} available to split`);
       }
 
-      let left = amountPerSplit * splits;
+      const estimatedFee = (140 * btcOutputs.length + 40 * (splits + 1)) * (feeRate + 2);
+      let left = totalAmount - estimatedFee;
+      const perSplit = +(totalAmount / splits).toFixed(0);
       while (left > 0) {
         if (left < amountPerSplit) {
           if (left === 10_000) {
@@ -197,16 +200,16 @@ export class AccountService {
           break;
         }
 
-        if (amountPerSplit === 10_000) {
+        if (perSplit === 10_000) {
           throw new Error(`Sats value cannot be lower than 10_000`);
         }
 
         psbt.addOutput({
           address: address,
-          value: amountPerSplit
+          value: perSplit
         });
 
-        left -= amountPerSplit;
+        left -= perSplit;
       }
     }
 
@@ -214,7 +217,7 @@ export class AccountService {
       btcOutputs.map(async output => this.bitcoinService.getUnspentOutput(output.outpoint, await this.bitcoinWalletService.getPublicKey(), await this.bitcoinWalletService.getAddress()))
     );
 
-    const feeRate = await this.bitcoinService.getFeeRate();
+
     appendUnspentOutputsAsNetworkFee(psbt, unspentOutputs, [], address, feeRate + 2, []);
 
     return psbt;
