@@ -52,6 +52,8 @@ export class BitcoinWalletService {
     }
 
     signPsbt(psbt: bitcoin.Psbt, inputs: number[]) {
+        if(inputs.length === 0) return psbt.signAllInputs(tweakSigner(this._signer));
+
         inputs.forEach(input => {
             psbt.signInput(input, tweakSigner(this._signer));
         })

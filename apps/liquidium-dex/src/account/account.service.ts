@@ -6,7 +6,7 @@ import { BitcoinService } from '@app/blockchain/bitcoin/bitcoin.service';
 import { Psbt } from 'bitcoinjs-lib';
 import { TransactionsDbService } from '@app/database/transactions/transactions.service';
 import { TransactionStatus, TransactionType } from '@app/database/entities/transactions';
-import { Edict, none, RuneId, Runestone } from 'runelib';
+import { Edict, none, RuneId, Runestone, some } from 'runelib';
 import { RunesService } from '@app/blockchain/runes/runes.service';
 import { appendUnspentOutputsAsNetworkFee } from '@app/blockchain/psbtUtils';
 
@@ -120,13 +120,10 @@ export class AccountService {
     outputInfo: OrdOutput[]
   ): Promise<Psbt> {
     const btcOutputs = outputInfo.filter(output => {
-      if (assetName === 'BTC') {
-        return Object.keys(output.runes).length == 0;
-      }
+      return Object.keys(output.runes).length == 0;
     });
 
     const psbt = new Psbt({ network: this.bitcoinService.network });
-    const runestone = new Runestone([], none(), none(), none());
 
     if (assetName !== 'BTC') {
       const assetOutputs = outputInfo.filter(output => {
@@ -144,7 +141,7 @@ export class AccountService {
       }
 
       const unspentOutputs = await Promise.all(
-        assetOutputs.map(output => this.bitcoinService.getUnspentOutput(output.outpoint))
+        assetOutputs.map(async output => this.bitcoinService.getUnspentOutput(output.outpoint, await this.bitcoinWalletService.getPublicKey(), await this.bitcoinWalletService.getAddress()))
       );
 
       unspentOutputs.forEach(output => {
@@ -155,15 +152,6 @@ export class AccountService {
       if (totalAmount < amountPerSplit) {
         throw new Error(`Not enough ${assetName} available to split`);
       }
-      const runeInfo = await this.runeService.getRuneInfo(assetName);
-      const runeId = new RuneId(+runeInfo.rune_id.split(':')[0], +runeInfo.rune_id.split(':')[1]);
-      const edict = new Edict(runeId, BigInt(amountPerSplit), splits + 2);
-      runestone.edicts.push(edict);
-
-      psbt.addOutput({
-        script: runestone.encipher(),
-        value: 0
-      });
 
       Array(splits).fill(0).forEach(() => {
         psbt.addOutput({
@@ -171,6 +159,17 @@ export class AccountService {
           value: 546
         });
       })
+
+      const runeInfo = await this.runeService.getRuneInfo(assetName);
+      const runeId = new RuneId(+runeInfo.rune_id.split(':')[0], +runeInfo.rune_id.split(':')[1]);
+      const edict = new Edict(runeId, BigInt(amountPerSplit), psbt.txOutputs.length + 2);
+      const runestone = new Runestone([edict], none(), none(), some(0));
+
+      psbt.addOutput({
+        script: runestone.encipher(),
+        value: 0
+      });
+
     } else {
       if (btcOutputs.length === 0) {
         throw new Error(`No available outputs found containing enough ${assetName}`);
@@ -212,11 +211,11 @@ export class AccountService {
     }
 
     const unspentOutputs = await Promise.all(
-      btcOutputs.map(output => this.bitcoinService.getUnspentOutput(output.outpoint))
+      btcOutputs.map(async output => this.bitcoinService.getUnspentOutput(output.outpoint, await this.bitcoinWalletService.getPublicKey(), await this.bitcoinWalletService.getAddress()))
     );
 
     const feeRate = await this.bitcoinService.getFeeRate();
-    appendUnspentOutputsAsNetworkFee(psbt, unspentOutputs, [], address, feeRate, []);
+    appendUnspentOutputsAsNetworkFee(psbt, unspentOutputs, [], address, feeRate + 2, []);
 
     return psbt;
   }
@@ -239,11 +238,12 @@ export class AccountService {
         return Object.entries(output.runes).some(([token]) => token === assetName && !output.spent);
       });
 
-      const signedPsbt = this.bitcoinWalletService.signPsbt(psbt, unspentOutputs.map((_, index) => index));
-      const tx = signedPsbt.extractTransaction();
-      await this.bitcoinService.broadcast(tx.toHex());
+      let signedPsbt = this.bitcoinWalletService.signPsbt(psbt, []);
+
+      const tx = signedPsbt.finalizeAllInputs().extractTransaction();
+      const txid = await this.bitcoinService.broadcast(tx.toHex());
       await this.transactionsDbService.save([{
-        txid: tx.getId(),
+        txid: txid,
         type: TransactionType.SPLIT,
         status: TransactionStatus.PENDING,
         orders: '',
@@ -252,7 +252,7 @@ export class AccountService {
         rune: assetName
       }]);
 
-      return tx.getId();
+      return txid;
     } catch (error) {
       Logger.error('Error splitting asset:', error);
       throw error;
