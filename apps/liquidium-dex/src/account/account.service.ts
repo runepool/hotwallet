@@ -9,6 +9,7 @@ import { TransactionStatus, TransactionType } from '@app/database/entities/trans
 import { Edict, none, RuneId, Runestone, some } from 'runelib';
 import { RunesService } from '@app/blockchain/runes/runes.service';
 import { appendUnspentOutputsAsNetworkFee } from '@app/blockchain/psbtUtils';
+import { AutoSplitConfigService } from '@app/database/auto-split/auto-split.service';
 
 type OutputHealth = {
   location: string;
@@ -26,6 +27,13 @@ type OutputsHealth = {
   [key: string]: OutputHealth[];
 };
 
+type AutoSplitConfig = {
+  assetName: string;
+  enabled: boolean;
+  maxCost: number;
+  splitSize: number;
+}
+
 @Injectable()
 export class AccountService {
   constructor(
@@ -33,7 +41,9 @@ export class AccountService {
     private readonly runeService: RunesService,
     private readonly ordService: OrdClient,
     private readonly bitcoinService: BitcoinService,
-    private readonly bitcoinWalletService: BitcoinWalletService) { }
+    private readonly bitcoinWalletService: BitcoinWalletService,
+    private readonly autoSplitConfigService: AutoSplitConfigService
+  ) { }
 
   async getBalance(): Promise<{ address: string; balance: number, token: string }[]> {
     const btcBalance = {
@@ -261,4 +271,37 @@ export class AccountService {
       throw error;
     }
   }
+
+  async setAutoSplitStrategy(config: AutoSplitConfig): Promise<void> {
+    try {
+      // Validate configuration
+      if (config.maxCost <= 0) {
+        throw new Error('Maximum cost must be greater than 0');
+      }
+      if (config.splitSize <= 0) {
+        throw new Error('Split size must be greater than 0');
+      }
+
+      // Store the configuration
+      await this.autoSplitConfigService.set(config);
+      Logger.log(`Auto split strategy set for ${config.assetName}`);
+    } catch (error) {
+      Logger.error('Error setting auto split strategy:', error);
+      throw error;
+    }
+  }
+
+  async getAutoSplitStrategy(assetName: string): Promise<AutoSplitConfig | undefined> {
+    const config = await this.autoSplitConfigService.get(assetName);
+    return config || undefined;
+  }
+
+  async getAllAutoSplitStrategies(): Promise<AutoSplitConfig[]> {
+    return this.autoSplitConfigService.getAll();
+  }
+
+  async removeAutoSplitStrategy(assetName: string): Promise<boolean> {
+    return this.autoSplitConfigService.remove(assetName);
+  }
+
 }

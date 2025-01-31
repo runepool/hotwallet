@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RuneOrdersModule } from './rune-orders/rune-orders.module';
 import { TransactionsDbModule } from './transactions/pending-transactions.module';
+import { AutoSplitConfigModule } from './auto-split/auto-split.module';
 
 @Module({
   imports: [
@@ -13,8 +14,9 @@ import { TransactionsDbModule } from './transactions/pending-transactions.module
       synchronize: true, // Auto-create tables in dev; disable in production
     }),
     RuneOrdersModule,
-    TransactionsDbModule
+    TransactionsDbModule,
+    AutoSplitConfigModule
   ],
-  exports: [RuneOrdersModule, TransactionsDbModule],
+  exports: [RuneOrdersModule, TransactionsDbModule, AutoSplitConfigModule],
 })
 export class DatabaseModule { }

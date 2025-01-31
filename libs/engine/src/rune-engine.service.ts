@@ -202,12 +202,11 @@ export class RuneEngineService implements OnModuleInit {
         }
 
         const edict = new Edict(runeId, BigInt(netAmount), receiverOutpoint);
-
         const runestone = new Runestone([feeEdict, edict], none(), none(), none());
 
         const swapPsbt = new Psbt({ network: this.walletService.network });
-
         const sellerInputsToSign: SignableInput[] = [];
+        
         selectedOutputs.forEach((output, index) => {
             swapPsbt.addInput(output.toInput());
             sellerInputsToSign.push({ index, signerAddress: output.address, singerPublicKey: output.publicKey, location: output.location });
