@@ -18,7 +18,7 @@ export class PendingTransactionController {
     // Fetch all pending transactions
     @Get()
     async fetchAll(): Promise<Transaction[]> {
-        return this.service.findAll();
+        return this.service.findMempoolTransactions();
     }
 
     // Fetch a single transaction by ID

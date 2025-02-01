@@ -55,12 +55,14 @@ export class TransactionsDbService {
 
 
     /**
-     * Fetch all transactions with status 'pending' or 'confirming' using query builder.
+     * Fetch all transactions that landed in the mempool.
      */
-    async findConfirming(): Promise<Transaction[]> {
+    async findMempoolTransactions(): Promise<Transaction[]> {
         return await this.transactionRepository
             .createQueryBuilder('transaction')
             .orWhere('transaction.status = :confirming', { confirming: 'confirming' })
+            .orWhere('transaction.status = :confirmed', { confirmed: 'confirmed' })
+            // .orWhere('transaction.type  = :split', { split: 'split' })
             .getMany();
     }
 }
