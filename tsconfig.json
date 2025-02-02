@@ -47,6 +47,12 @@
       ],
       "@app/nostr/*": [
         "libs/nostr/src/*"
+      ],
+      "@app/exchange-database": [
+        "libs/exchange-database/src"
+      ],
+      "@app/exchange-database/*": [
+        "libs/exchange-database/src/*"
       ]
     }
   }

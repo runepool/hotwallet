@@ -72,6 +72,15 @@
       "compilerOptions": {
         "tsConfigPath": "apps/exchange/tsconfig.app.json"
       }
+    },
+    "exchange-database": {
+      "type": "library",
+      "root": "libs/exchange-database",
+      "entryFile": "index",
+      "sourceRoot": "libs/exchange-database/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/exchange-database/tsconfig.lib.json"
+      }
     }
   }
 }

@@ -11,14 +11,9 @@ export enum OrderStatus {
   CANCELED = 'canceled',
 }
 
-
 const BigIntTransformer = {
-  from: (value: string) => {
-    return BigInt(value || 0);
-  },
-  to: (value: bigint) => {
-    return value && value.toString();
-  },
+  from: (value: string) => BigInt(value || 0),
+  to: (value: bigint) => value?.toString(),
 };
 
 @Entity()
@@ -29,29 +24,17 @@ export class RuneOrder {
   @Column()
   rune: string;
 
-  @Column('bigint', {
-    default: 0n,
-    transformer: BigIntTransformer
-  })
+  @Column('bigint', { transformer: BigIntTransformer })
   quantity: bigint;
 
-  @Column('bigint', {
-    default: 0n,
-    transformer: BigIntTransformer
-  })
+  @Column('bigint', { transformer: BigIntTransformer })
   filledQuantity: bigint;
 
-  @Column('bigint', {
-    default: 0n,
-    transformer: BigIntTransformer
-  })
+  @Column('bigint', { transformer: BigIntTransformer })
   price: bigint;
 
-  @Column({ default: 'open' })
-  status: string;
-
-  @Column({ type: 'text' })
-  type: RuneOrderType;
+  @Column({ type: 'enum', enum: OrderStatus })
+  status: OrderStatus;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { RuneOrdersService } from './rune-orders.service';
+import { RuneOrdersService } from './rune-orders-database.service';
 import { RuneOrder } from '../entities/rune-order';
 
 @Module({
@@ -9,4 +9,4 @@ import { RuneOrder } from '../entities/rune-order';
   providers: [RuneOrdersService],
   exports: [RuneOrdersService],
 })
-export class RuneOrdersModule { }
+export class RuneOrdersDatabaseModule { }

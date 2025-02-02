@@ -13,8 +13,6 @@ import { AutoSplitConfigModule } from './auto-split/auto-split.module';
       autoLoadEntities: true,
       synchronize: true, // Auto-create tables in dev; disable in production
     }),
-    RuneOrdersModule,
-    TransactionsDbModule,
     AutoSplitConfigModule
   ],
   exports: [RuneOrdersModule, TransactionsDbModule, AutoSplitConfigModule],
