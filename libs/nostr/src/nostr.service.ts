@@ -46,7 +46,7 @@ export class NostrService implements OnModuleInit {
                 ["amt", content.quantity.toString()],
                 ["price", content.price.toString()],
                 ["rune", content.rune],
-                ["d", "liquidium-dex"],
+                ["d", "runepool"],
                 ["network", "mainnet"],
             ],
             content: ""
