@@ -5,11 +5,12 @@ import { OrdOutput } from '@app/blockchain/common/ord-client/types';
 import { BitcoinService } from '@app/blockchain/bitcoin/bitcoin.service';
 import { Psbt } from 'bitcoinjs-lib';
 import { TransactionsDbService } from '@app/database/transactions/transactions.service';
-import { TransactionStatus, TransactionType } from '@app/database/entities/transactions';
 import { Edict, none, RuneId, Runestone, some } from 'runelib';
 import { RunesService } from '@app/blockchain/runes/runes.service';
 import { appendUnspentOutputsAsNetworkFee } from '@app/blockchain/psbtUtils';
 import { AutoSplitConfigService } from '@app/database/auto-split/auto-split.service';
+import { TransactionType } from '@app/database/entities/transaction.entity';
+import { TransactionStatus } from '@app/exchange-database/entities/transaction.entity';
 
 type OutputHealth = {
   location: string;

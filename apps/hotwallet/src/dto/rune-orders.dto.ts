@@ -1,4 +1,5 @@
-import { RuneOrderType } from '@app/database/entities/rune-order';
+
+import { RuneOrderType } from '@app/database/entities/rune-order.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateRuneOrderDto {

@@ -1,10 +1,8 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Network } from 'bitcoinjs-lib';
 import { lastValueFrom } from 'rxjs';
 import { TraceMe } from 'src/tracing';
-import { trace } from '@opentelemetry/api';
-import { Network } from 'bitcoinjs-lib';
 import { FeeEstimation, OutspendInfo, TxInfo, TxStatus, Utxo } from './types';
 
 const tracer = trace.getTracer('blockstream-client');
@@ -16,8 +14,7 @@ export class BlockstreamClient {
 
   constructor(
     private http: HttpService,
-    private config: ConfigService
-  ) {}
+  ) { }
 
   @TraceMe(tracer, 'broadcast')
   async broadcast(txHex: string) {

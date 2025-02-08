@@ -57,8 +57,10 @@
     "bitcoinjs-lib": "^6.1.7",
     "class-validator": "^0.14.1",
     "decimal.js": "^10.5.0",
+    "dotenv": "^16.4.7",
     "ecpair": "^2.1.0",
     "nostr-tools": "^2.10.4",
+    "pg": "^8.13.1",
     "reflect-metadata": "^0.1.13",
     "runelib": "^1.0.7",
     "rxjs": "^7.8.1",
@@ -118,7 +120,8 @@
       "^@app/engine(|/.*)$": "<rootDir>/libs/engine/src/$1",
       "^@app/blockchain(|/.*)$": "<rootDir>/libs/blockchain/src/$1",
       "^@app/nostr(|/.*)$": "<rootDir>/libs/nostr/src/$1",
-      "^@app/exchange-database(|/.*)$": "<rootDir>/libs/exchange-database/src/$1"
+      "^@app/exchange-database(|/.*)$": "<rootDir>/libs/exchange-database/src/$1",
+      "^@app/execution(|/.*)$": "<rootDir>/libs/execution/src/$1"
     }
   }
 }

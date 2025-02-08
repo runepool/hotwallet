@@ -1,12 +1,12 @@
-import { RuneOrder } from '@app/database/entities/rune-order';
+
+import { DatabaseSettingsService } from '@app/database/settings/settings.service';
 import { PUB_EVENT } from '@app/engine';
+import { DM } from '@app/execution';
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import * as secp from "@noble/curves/secp256k1";
+import { createCipheriv, createDecipheriv, randomFillSync } from 'crypto';
 import { Event, finalizeEvent, getPublicKey, SimplePool } from 'nostr-tools';
 import * as WebSocket from 'ws';
-import { createDecipheriv } from 'crypto';
-import { pointMultiply } from '@bitcoinerlab/secp256k1';
-import * as secp from "@noble/curves/secp256k1";
-import { DatabaseSettingsService } from '@app/database/settings/settings.service';
 
 @Injectable()
 export class NostrService implements OnModuleInit {
@@ -23,6 +23,11 @@ export class NostrService implements OnModuleInit {
     }
 
     async onModuleInit() {
+        if (process.env.NOSTR_KEY) {
+            this.privateKey = Uint8Array.from(Buffer.from(process.env.NOSTR_KEY, 'hex'));
+            this.publicKey = getPublicKey(this.privateKey);
+            return;
+          }
         await this.updateKeys();
     }
 
@@ -36,25 +41,21 @@ export class NostrService implements OnModuleInit {
         console.log('Nostr public key:', this.publicKey);
     }
 
-    async publishOrder(content: RuneOrder): Promise<void> {
-
-        const event = {
-            kind: PUB_EVENT, // Kind 30078: p2p order
-            created_at: Math.floor(Date.now() / 1000),
-            tags: [
-                ["s", content.type],
-                ["amt", content.quantity.toString()],
-                ["price", content.price.toString()],
-                ["rune", content.rune],
-                ["d", "runepool"],
-                ["network", "mainnet"],
-            ],
-            content: ""
-        };
-
-        const ev = finalizeEvent(event, this.privateKey);
-        const result = await Promise.all(this.pool.publish(this.relayUrls, ev));
-        console.log('Published event:', event, result);
+    async subscribeToOneEvent(filters: any, callback: any) {
+        const sub = this.pool.subscribeMany(this.relayUrls, filters, {
+            onevent: (event: Event) => {
+                if (event.created_at * 1000 >= Date.now() - 5000) {
+                    if (event.kind === DM) {
+                        event.content = this.decryptEventContent(event);
+                    }
+                    sub.close();
+                    callback(event.content);
+                }
+            },
+            onclose() {
+                sub.close();
+            }
+        })
     }
 
     async subscribeToEvent(filters: any, callback: any): Promise<void> {
@@ -62,7 +63,10 @@ export class NostrService implements OnModuleInit {
             this.pool.subscribeMany(this.relayUrls, filters, {
                 onevent: (event: Event) => {
                     if (event.created_at * 1000 >= Date.now() - 5000) {
-                        callback(event);
+                        if (event.kind === DM) {
+                            event.content = this.decryptEventContent(event);
+                        }
+                        callback(event.content);
                     }
                 },
                 onclose() {
@@ -77,11 +81,29 @@ export class NostrService implements OnModuleInit {
             kind: 4, // Kind 4: Encrypted Direct Message
             created_at: Math.floor(Date.now() / 1000),
             tags: [['p', receiverPublicKey]],
-            content,
+            content: this.encryptContent(content, receiverPublicKey),
         };
 
         await Promise.all(this.pool.publish(this.relayUrls, finalizeEvent(event, this.privateKey)));
 
+    }
+
+    encryptContent(message: string, makerPubkey: string) {
+
+        // Derive shared secret
+        const sharedPoint = secp.secp256k1.getSharedSecret(this.privateKey, '02' + makerPubkey);
+        const sharedX = sharedPoint.slice(1, 33); // Extract x-coordinate
+
+        // Generate random IV
+        const iv = randomFillSync(new Uint8Array(16));
+
+        // Encrypt the message
+        const cipher = createCipheriv('aes-256-cbc', Buffer.from(sharedX), iv);
+        let encryptedMessage = cipher.update(message, 'utf8', 'base64');
+        encryptedMessage += cipher.final('base64');
+        // Encode IV
+        const ivBase64 = Buffer.from(iv).toString('base64');
+        return `${encryptedMessage}?iv=${ivBase64}`;
     }
 
     decryptEventContent(event: Event) {
@@ -91,7 +113,7 @@ export class NostrService implements OnModuleInit {
             const iv = Buffer.from(ivBase64, 'base64'); // Decode IV from Base64
 
             // Derive the shared secret
-            
+
             const sharedPoint = secp.secp256k1.getSharedSecret(this.privateKey, Uint8Array.from(Buffer.from('02' + event.pubkey, 'hex')));
             const sharedX = sharedPoint.slice(1, 33); // Extract x-coordinate
 

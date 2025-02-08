@@ -53,6 +53,12 @@
       ],
       "@app/exchange-database/*": [
         "libs/exchange-database/src/*"
+      ],
+      "@app/execution": [
+        "libs/execution/src"
+      ],
+      "@app/execution/*": [
+        "libs/execution/src/*"
       ]
     }
   }

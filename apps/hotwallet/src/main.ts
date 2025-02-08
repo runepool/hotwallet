@@ -1,14 +1,14 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { HotWalletModule } from './hotwallet.module';
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-
+  const app = await NestFactory.create(HotWalletModule);
   // Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('P2P Decentralized Exchange API')

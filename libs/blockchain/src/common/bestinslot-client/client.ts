@@ -1,6 +1,5 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { BestInSlotResponse, InscriptionBatchResponse, RuneInfo, PossiblyEmptyRuneOutput, RuneOutput, Brc20 } from './types';
 import { lastValueFrom } from 'rxjs';
 
@@ -12,13 +11,11 @@ export class BestinslotClient {
 
   constructor(
     private http: HttpService,
-    private config: ConfigService
   ) {
-    this.network =
-      this.config.getOrThrow('BITCOIN_NETWORK') === 'bitcoin' ? 'mainnet' : this.config.getOrThrow('BITCOIN_NETWORK');
-    this.apiKey = this.config.get('BIS_API_KEY');
+    this.network = process.env['BITCOIN_NETWORK'] === 'bitcoin' ? 'mainnet' : process.env['BITCOIN_NETWORK'] as any;
+    this.apiKey = process.env['BIS_API_KEY'];
 
-    if (this.config.getOrThrow('BITCOIN_NETWORK') === 'bitcoin') {
+    if (process.env['BITCOIN_NETWORK'] === 'bitcoin') {
       this.url = `https://api.bestinslot.xyz/v3`;
     } else {
       this.url = `https://${this.network}.api.bestinslot.xyz/v3`;

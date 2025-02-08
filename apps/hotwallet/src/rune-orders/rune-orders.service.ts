@@ -1,14 +1,15 @@
 import { RunesService } from '@app/blockchain/runes/runes.service';
-import { RuneOrder } from '@app/database/entities/rune-order';
-import { RuneOrdersService as PersistenceService } from '@app/database/rune-orders/rune-orders.service';
+
+import { RuneOrder } from '@app/database/entities/rune-order.entity';
 import { Injectable } from '@nestjs/common';
 import { CreateBatchRuneOrderDto, CreateRuneOrderDto } from '../dto/rune-orders.dto';
+import { RuneOrdersService as DbService } from '@app/database/rune-orders/rune-orders-database.service';
 
 @Injectable()
 export class RuneOrdersService {
   constructor(
-    private readonly runeService: RunesService,
-    private readonly dbService: PersistenceService) { }
+    private readonly dbService: DbService,
+    private readonly runeService: RunesService) { }
 
   async createOrder(orderData: CreateRuneOrderDto): Promise<RuneOrder> {
 
@@ -19,9 +20,8 @@ export class RuneOrdersService {
       price: BigInt(orderData.price),
       quantity: BigInt(+orderData.quantity * 10 ** runeInfo.decimals),
       type: orderData.type
-    } as RuneOrder;
+    } as Partial<RuneOrder>;
 
-    // await this.nostrService.publishOrder(order);
     const orders = await this.dbService.createOrder(order);
     return orders;
 
@@ -38,10 +38,6 @@ export class RuneOrdersService {
         type: order.type
       })
     });
-
-    for (const order of orders) {
-      // await this.nostrService.publishOrder(order as any);
-    }
 
     return await this.dbService.save(await Promise.all(orders));
   }

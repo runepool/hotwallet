@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { RuneOrdersDatabaseModule } from './rune-orders/rune-orders-database.module';
-import { TransactionsDbModule } from '@app/database/transactions/pending-transactions.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { getDatabaseConfig } from './config/database.config';
+import { RuneOrdersDatabaseModule } from './rune-orders/rune-orders-database.module';
+import { TransactionDBModule } from './transactions/transactions-database.module';
 
 @Module({
   imports: [
@@ -16,9 +16,11 @@ import { getDatabaseConfig } from './config/database.config';
       inject: [ConfigService],
     }),
     RuneOrdersDatabaseModule,
-    TransactionsDbModule,
+    TransactionDBModule,
   ],
-  providers: [],
-  exports: [TypeOrmModule]
+  exports: [
+    RuneOrdersDatabaseModule,
+    TransactionDBModule,
+  ]
 })
 export class ExchangeDatabaseModule { }

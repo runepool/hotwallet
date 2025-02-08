@@ -1,9 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { RuneOrdersModule } from './rune-orders/rune-orders.module';
+
 import { TransactionsDbModule } from './transactions/pending-transactions.module';
 import { AutoSplitConfigModule } from './auto-split/auto-split.module';
+import { RuneOrdersDatabaseModule } from './rune-orders/rune-orders-database.module';
 
+  /**
+   * A NestJS module that sets up TypeORM and imports the necessary
+   * database modules for the application.
+   *
+   * This module should be imported in the root application module.
+   *
+   * @module DatabaseModule
+   */
 @Module({
   imports: [
     TypeOrmModule.forRoot({
@@ -13,8 +22,10 @@ import { AutoSplitConfigModule } from './auto-split/auto-split.module';
       autoLoadEntities: true,
       synchronize: true, // Auto-create tables in dev; disable in production
     }),
-    AutoSplitConfigModule
+    AutoSplitConfigModule,
+    RuneOrdersDatabaseModule,
+    TransactionsDbModule,
   ],
-  exports: [RuneOrdersModule, TransactionsDbModule, AutoSplitConfigModule],
+  exports: [RuneOrdersDatabaseModule, TransactionsDbModule, AutoSplitConfigModule],
 })
 export class DatabaseModule { }

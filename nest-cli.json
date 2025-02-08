@@ -81,6 +81,15 @@
       "compilerOptions": {
         "tsConfigPath": "libs/exchange-database/tsconfig.lib.json"
       }
+    },
+    "execution": {
+      "type": "library",
+      "root": "libs/execution",
+      "entryFile": "index",
+      "sourceRoot": "libs/execution/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/execution/tsconfig.lib.json"
+      }
     }
   }
 }

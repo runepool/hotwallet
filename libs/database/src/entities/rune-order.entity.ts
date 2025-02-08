@@ -33,17 +33,8 @@ export class RuneOrder {
   @Column('bigint', { transformer: BigIntTransformer })
   price: bigint;
 
-  @Column({ type: 'enum', enum: OrderStatus })
-  status: OrderStatus;
-
   @Column()
-  makerNostryKey: string;
-
-  @Column()
-  makerAddress: string;
-
-  @Column()
-  makerPublicKey: string;
+  status: string;
 
   @CreateDateColumn()
   createdAt: Date;

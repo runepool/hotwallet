@@ -1,10 +1,19 @@
+import { ExchangeDatabaseModule } from '@app/exchange-database';
 import { Module } from '@nestjs/common';
-import { ExchangeController } from './exchange.controller';
-import { ExchangeService } from './exchange.service';
+import { ConfigModule } from '@nestjs/config';
+import { RuneOrdersModule } from './rune-orders/rune-orders.module';
+import { EngineModule } from '@app/engine';
+import { config } from 'dotenv';
 
+config({ path: './._env' });
 @Module({
-  imports: [],
-  controllers: [ExchangeController],
-  providers: [ExchangeService],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    ExchangeDatabaseModule,
+    RuneOrdersModule,
+    EngineModule
+  ],
 })
-export class ExchangeModule {}
+export class ExchangeModule { }

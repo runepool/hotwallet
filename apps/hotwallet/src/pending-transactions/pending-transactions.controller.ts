@@ -1,4 +1,5 @@
-import { Transaction } from '@app/database/entities/transactions';
+
+import { Transaction } from '@app/database/entities/transaction.entity';
 import { TransactionsDbService } from '@app/database/transactions/transactions.service';
 import {
     Controller,

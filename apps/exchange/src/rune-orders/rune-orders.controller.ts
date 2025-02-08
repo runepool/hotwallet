@@ -6,7 +6,7 @@ import { ApiTags } from '@nestjs/swagger';
 @ApiTags('Rune Orders')
 @Controller('rune-orders')
 export class RuneOrdersController {
-  constructor(private readonly ordersService: RuneOrdersService) {}
+  constructor(private readonly ordersService: RuneOrdersService) { }
 
   @Post()
   create(@Body() createOrderDto: CreateRuneOrderDto) {
@@ -20,16 +20,16 @@ export class RuneOrdersController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.ordersService.findOne(+id);
+    return this.ordersService.findOne(id);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateOrderDto: UpdateRuneOrderDto) {
-    return this.ordersService.update(+id, updateOrderDto);
+    return this.ordersService.update(id, updateOrderDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.ordersService.remove(+id);
+    return this.ordersService.remove(id);
   }
 }

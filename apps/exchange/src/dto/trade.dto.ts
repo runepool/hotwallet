@@ -16,16 +16,20 @@ export class CreateTradeDto {
     side: OrderSide;
 
     @IsString()
-    @IsEnum(OrderType)
-    type: OrderType;
-
-    @IsString()
-    baseAsset: string;
-
-    @IsString()
-    quoteAsset: string;
+    rune: string;
 
     @IsNumber()
     quantity: number;
 
+    @IsString()
+    takerPaymentAddress: string;
+
+    @IsString()
+    takerPaymentPublicKey: string;
+
+    @IsString()
+    takerRuneAddress: string;
+
+    @IsString()
+    takerRunePublicKey: string;
 }

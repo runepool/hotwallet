@@ -2,12 +2,12 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 
-import { PendingTransactionsService } from 'apps/hotwallet/src/pending-transactions/pending-transactions.service';
 import { Transaction } from '../entities/transaction.entity';
+import { TransactionsDbService } from './transactions-database.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Transaction])],
-  providers: [PendingTransactionsService],
-  exports: [PendingTransactionsService],
+  providers: [TransactionsDbService],
+  exports: [TransactionsDbService],
 })
 export class TransactionDBModule { }

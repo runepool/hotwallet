@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { ConfigModule } from '@nestjs/config';
 import { MempoolClient } from './client';
 import { AxiosRetryModule } from 'nestjs-axios-retry';
 import { AxiosError } from 'axios';
@@ -34,8 +33,6 @@ import axiosRetry from 'axios-retry';
         }
       }
     }),
-
-    ConfigModule
   ],
   exports: [MempoolClient]
 })

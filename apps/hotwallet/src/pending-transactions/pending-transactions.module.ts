@@ -2,9 +2,10 @@ import { DatabaseModule } from '@app/database';
 import { Module } from '@nestjs/common';
 import { PendingTransactionsService } from './pending-transactions.service';
 import { BlockchainModule } from '@app/blockchain';
+import { TransactionsDbModule } from '@app/database/transactions/pending-transactions.module';
 
 @Module({
-  imports: [DatabaseModule, BlockchainModule],
+  imports: [DatabaseModule, BlockchainModule, TransactionsDbModule],
   providers: [PendingTransactionsService],
   exports: [PendingTransactionsService]
 })

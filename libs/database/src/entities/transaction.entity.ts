@@ -1,10 +1,16 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
 export enum TransactionStatus {
   PENDING = 'pending',
   CONFIRMING = 'confirming',
   CONFIRMED = 'confirmed',
   ERRORED = 'errored'
+}
+
+export enum TransactionType {
+  BUY = 'buy',
+  SELL = 'sell',
+  SPLIT = 'split'
 }
 
 @Entity()
@@ -14,6 +20,9 @@ export class Transaction {
 
   @Column()
   rune: string;
+
+  @Column({ unique: true })
+  tradeId: string;
 
   @Column({ nullable: true })
   txid: string;
@@ -30,13 +39,12 @@ export class Transaction {
   @Column()
   price: string;
 
-  @Column({
-    type: 'enum',
-    enum: TransactionStatus,
-    default: TransactionStatus.PENDING
-  })
+  @Column({ default: 0 })
+  confirmations: number
+
+  @Column({ default: 'pending' })
   status: TransactionStatus;
 
-  @Column({ default: 0 })
-  confirmations: number;
+  @CreateDateColumn()
+  createdAt: Date;
 }

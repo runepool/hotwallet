@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Transaction } from '../entities/transactions';
+import { Transaction } from '../entities/transaction.entity';
+
 
 @Injectable()
 export class TransactionsDbService {
@@ -31,7 +32,6 @@ export class TransactionsDbService {
         return await this.transactionRepository.findOneBy({ id });
     }
 
-
     async delete(id: string): Promise<void> {
         await this.transactionRepository.delete({
             id
@@ -52,7 +52,6 @@ export class TransactionsDbService {
             .orWhere('transaction.status = :confirming', { confirming: 'confirming' })
             .getMany();
     }
-
 
     /**
      * Fetch all transactions that landed in the mempool.

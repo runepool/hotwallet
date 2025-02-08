@@ -1,27 +1,24 @@
+import { OrderStatus } from '@app/exchange-database/entities/rune-order.entity';
 import { IsString, IsNumber, IsEnum } from 'class-validator';
-import { RuneOrderStatus } from '@database/entities/rune-order';
 
 export class CreateRuneOrderDto {
   @IsString()
   rune: string;
 
   @IsNumber()
-  amount: number;
+  amount: bigint;
 
   @IsNumber()
-  price: number;
-
-  @IsEnum(RuneOrderStatus)
-  status: RuneOrderStatus;
+  price: bigint;
 }
 
 export class UpdateRuneOrderDto {
   @IsNumber()
-  amount?: number;
+  amount?: bigint;
 
   @IsNumber()
-  price?: number;
+  price?: bigint;
 
-  @IsEnum(RuneOrderStatus)
-  status?: RuneOrderStatus;
+  @IsEnum(OrderStatus)
+  status?: OrderStatus;
 }

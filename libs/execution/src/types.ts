@@ -1,8 +1,6 @@
-import { SignableInput, UnspentOutput } from "@app/blockchain/bitcoin/types/UnspentOutput";
-import { RuneOrder } from "@app/exchange-database/entities/rune-order.entity";
+import { SignableInput } from "@app/blockchain/bitcoin/types/UnspentOutput";
 
-
-interface SwapInfo {
+export interface SwapInfo {
     fromToken: string;
     toToken: string;
     fromAmount: string;
@@ -30,10 +28,38 @@ export class SwapResult {
     error?: string;
 }
 
-export class SwapMessage<T> {
-    type: 'prepare' | 'result'
+export class Message<T> {
+    type: 'reserve_request' | 'reserve_response' | 'sign_request' | 'sign_response' | 'result'
     data: T
 }
+
+export class ReserveOrdersResponse {
+    status: 'success' | 'error';
+    tradeId: string;
+}
+
+export class ReserveOrdersRequest {
+    tradeId: string;
+    orders: OrderFill[]
+}
+
+export interface OrderFill {
+    orderId: string;
+    amount: string;
+}
+
+export class SignRequest {
+    tradeId: string;
+    psbtBase64: string;
+    inputsToSign: SignableInput[];
+}
+
+export class SignResponse {
+    status: 'success' | 'error';
+    tradeId: string;
+    signedPsbtBase64: string;
+}
+
 
 export class RuneFillRequest {
     takerPaymentAddress: string;
@@ -43,11 +69,4 @@ export class RuneFillRequest {
     side: 'buy' | 'sell';
     amount: bigint;
     rune: string;
-}
-
-export interface SelectedOrder {
-    order: RuneOrder;
-    usedAmount: bigint;
-    satAmount: bigint;
-    outputs: UnspentOutput[];
 }
