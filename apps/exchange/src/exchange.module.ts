@@ -4,6 +4,10 @@ import { ConfigModule } from '@nestjs/config';
 import { RuneOrdersModule } from './rune-orders/rune-orders.module';
 import { EngineModule } from '@app/engine';
 import { config } from 'dotenv';
+import { QuoteService } from './quote/quote.service';
+import { ExchangeController } from './exchange.controller';
+import { QuoteModule } from './quote/quote.module';
+import { QuoteController } from './quote/quote.controller';
 
 config({ path: './._env' });
 @Module({
@@ -13,7 +17,9 @@ config({ path: './._env' });
     }),
     ExchangeDatabaseModule,
     RuneOrdersModule,
+    QuoteModule,
     EngineModule
   ],
+  controllers: [ExchangeController, QuoteController],
 })
 export class ExchangeModule { }

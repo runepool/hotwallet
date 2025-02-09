@@ -23,7 +23,7 @@ export class SettingsService {
       nostrPublicKey: settings.nostrPublicKey,
     };
   }
-  
+
   async updateSettings(newSettings: UserSettings): Promise<void> {
     await this.dbSettingsService.updateSettings({
       bitcoinPrivateKey: newSettings.bitcoinPrivateKey,

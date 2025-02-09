@@ -43,7 +43,7 @@ export class Transaction {
   confirmations: number
 
   @Column({ default: 'pending' })
-  status: TransactionStatus;
+  status: string;
 
   @CreateDateColumn()
   createdAt: Date;

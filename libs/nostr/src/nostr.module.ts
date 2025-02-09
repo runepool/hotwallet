@@ -5,6 +5,6 @@ import { DatabaseSettingsModule } from '@app/database/settings/settings.module';
 @Module({
   imports: [DatabaseSettingsModule],
   providers: [NostrService],
-  exports: [NostrService],
+  exports: [NostrService, DatabaseSettingsModule],
 })
 export class NostrModule {}

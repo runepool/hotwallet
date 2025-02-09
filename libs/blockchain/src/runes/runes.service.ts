@@ -5,6 +5,7 @@ import { UnspentOutput } from '../bitcoin/types/UnspentOutput';
 import { InscriptionProvider } from '../common/inscription-provider/provider';
 import { RuneInfo, RuneOutput } from '../common/inscription-provider/types';
 import { RuneID } from './types';
+import { Errors, OracleError } from 'libs/errors/errors';
 
 
 @Injectable()
@@ -127,5 +128,33 @@ export class RunesService {
 
   async getRuneInfo(runeId: string): Promise<RuneInfo> {
     return this.inscriptionInfo.tickerInfo(runeId)
+  }
+
+
+
+  async selectRuneOutputs(runeOutputs: UnspentOutput[], runeId: string, runeAmount: bigint, usedOutputs: UnspentOutput[]) {
+    let hasRuneChange = false;
+    let totalRuneAmount: bigint = 0n;
+
+    for (const runeOutput of runeOutputs) {
+      if (!runeOutput.runeIds || runeOutput.runeIds.length == 0) continue;
+
+      const runeIdIndex = runeOutput.runeIds.findIndex(item => item === runeId);
+      totalRuneAmount += runeOutput.runeBalances[runeIdIndex];
+      usedOutputs.push(runeOutput);
+
+      if (runeOutput.runeIds.length > 1 || totalRuneAmount > BigInt(runeAmount)) {
+        hasRuneChange = true;
+      }
+
+      if (totalRuneAmount >= BigInt(runeAmount)) break;
+    }
+
+    if (totalRuneAmount < BigInt(runeAmount)) {
+      throw new OracleError(Errors.INSUFFICIENT_RUNE_AMOUNT)
+    }
+    const change = totalRuneAmount - BigInt(runeAmount);
+
+    return { hasRuneChange, totalRuneAmount, change };
   }
 }

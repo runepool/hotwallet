@@ -10,6 +10,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(ExchangeModule);
   
+  app.enableCors();
   const config = new DocumentBuilder()
     .setTitle('Exchange API')
     .setDescription('The Exchange API description')

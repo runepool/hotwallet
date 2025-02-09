@@ -4,6 +4,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionsDbModule } from './transactions/pending-transactions.module';
 import { AutoSplitConfigModule } from './auto-split/auto-split.module';
 import { RuneOrdersDatabaseModule } from './rune-orders/rune-orders-database.module';
+import { RuneOrder } from './entities/rune-order.entity';
+import { AutoSplitConfiguration } from './entities/auto-split-config.entity';
+import { SettingsEntity } from './entities/settings.entity';
+import { Transaction } from './entities/transaction.entity';
 
   /**
    * A NestJS module that sets up TypeORM and imports the necessary
@@ -18,8 +22,7 @@ import { RuneOrdersDatabaseModule } from './rune-orders/rune-orders-database.mod
     TypeOrmModule.forRoot({
       type: 'better-sqlite3' as any,
       database: process.env.DATABASE_NAME || 'exchange.db',
-      entities: [__dirname + '/entities/**/*.{.ts,.js}'],
-      autoLoadEntities: true,
+      entities: [RuneOrder,AutoSplitConfiguration, SettingsEntity, Transaction],
       synchronize: true, // Auto-create tables in dev; disable in production
     }),
     AutoSplitConfigModule,

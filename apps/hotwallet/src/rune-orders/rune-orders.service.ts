@@ -14,7 +14,6 @@ export class RuneOrdersService  {
     private readonly dbService: DbService,
     private readonly runeService: RunesService,
     private readonly exchangeClient: ExchangeClient,
-    private readonly configService: ConfigService
   ) { }
 
 
@@ -40,7 +39,7 @@ export class RuneOrdersService  {
         rune: localOrder.rune,
         quantity: localOrder.quantity,
         price: localOrder.price,
-        type: localOrder.type
+        type: localOrder.type as any
       });
       this.logger.log(`Order ${localOrder.id} mirrored to exchange successfully`);
     } catch (error) {
@@ -71,9 +70,11 @@ export class RuneOrdersService  {
     await Promise.all(localOrders.map(async (localOrder) => {
       try {
         await this.exchangeClient.createRuneOrder({
+          uuid: localOrder.id,
           rune: localOrder.rune,
           quantity: localOrder.quantity,
-          price: localOrder.price
+          price: localOrder.price,
+          type: localOrder.type as any
         });
         this.logger.log(`Order ${localOrder.id} mirrored to exchange successfully`);
       } catch (error) {

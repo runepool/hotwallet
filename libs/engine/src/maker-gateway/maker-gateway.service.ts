@@ -77,6 +77,7 @@ export class MakerGatewayService {
                 {
                     kinds: [DM],
                     '#p': [this.nostrService.publicKey],
+                    since: Date.now() / 1000
                 }
             ], async (event: Event) => {
                 try {
@@ -92,6 +93,11 @@ export class MakerGatewayService {
                 }
             })
 
+            await new Promise<void>((res) => {
+                setTimeout(() => {
+                    res();
+                }, 200);
+            })
             this.nostrService.publishDirectMessage(JSON.stringify({
                 type: 'reserve_request',
                 data: {
@@ -101,7 +107,7 @@ export class MakerGatewayService {
                     }],
                     tradeId
                 }
-            } as Message<ReserveOrdersRequest>), runeOrder.makerNostrKey);
+            } as Message<ReserveOrdersRequest>), runeOrder.makerNostrKey.slice(2));
 
         })
     }

@@ -1,12 +1,11 @@
-import { RuneFillRequest } from '@app/engine/types';
 import { NostrService } from '@app/nostr';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { DM } from '@app/nostr/constants';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Event } from 'nostr-tools';
-import { FillRuneOrderOffer, Message, ReserveOrdersResponse, SwapResult, SwapTransaction } from './types';
+import { Message } from './types';
 
 import { EventHandlerService } from './event-handler/event-handler.service';
 
-export const DM = 4;
 export const MAKER_BONUS = 100;
 export const PROTOCOL_FEE = 100;
 export const PROTOCOL_FEE_OUTPUT = 'bc1pughzj2s7d2979z3vaf0reaszrx5pye9k8glwvvha7yh0nt64kgzsx83r0c';
@@ -29,7 +28,7 @@ export class ExecutionService implements OnModuleInit {
             try {
                 const message: Message<any> = Object.assign(
                     new Message<any>(),
-                    JSON.parse(Buffer.from(event.content, 'base64').toString('utf-8'))
+                    JSON.parse(event.content)
                 );
 
                 if (message.type === 'reserve_request') {
@@ -40,7 +39,7 @@ export class ExecutionService implements OnModuleInit {
                     await this.eventHandlerService.handleSignRequest(message, event);
                 }
             } catch (error) {
-                console.log("Error", error);
+                console.error("Error", error);
                 // Logger.error("Could not decode nostr event")
             }
         })
@@ -112,4 +111,3 @@ export class ExecutionService implements OnModuleInit {
     //     return { txid, status: 'success' };
 
 }
-

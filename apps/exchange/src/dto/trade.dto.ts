@@ -23,42 +23,51 @@ export class CreateTradeDto {
 
     @ApiProperty({
         description: 'The rune identifier',
-        example: 'btc_usdt'
+        example: 'PEPE'
     })
     @IsString()
     rune: string;
 
     @ApiProperty({
-        description: 'The quantity of the trade',
-        example: 1000000
+        description: 'The quantity to trade in smallest units (sats for BTC, base units for runes)',
+        example: '100000'
     })
-    @IsNumber()
-    quantity: number;
+    @IsString()
+    quantity: string;
 
     @ApiProperty({
-        description: 'The taker payment address',
-        example: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
+        description: 'Maximum allowed slippage in basis points (e.g., 100 for 1%)',
+        example: '100',
+        default: '100'
+    })
+    @IsString()
+    @IsOptional()
+    slippage?: string;
+
+    @ApiProperty({
+        description: 'Bitcoin payment address',
+        example: 'bc1q...'
     })
     @IsString()
     takerPaymentAddress: string;
 
     @ApiProperty({
-        description: 'The taker payment public key',
-        example: '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+        description: 'Bitcoin public key',
+        example: '02...'
     })
     @IsString()
     takerPaymentPublicKey: string;
 
     @ApiProperty({
-        description: 'The taker rune address',
-        example: 'rune1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
+        description: 'Rune address',
+        example: 'rune1...'
     })
     @IsString()
     takerRuneAddress: string;
 
     @ApiProperty({
-        description: 'The taker rune public key',
-        example: '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+        description: 'Rune public key',
+        example: '02...'
     })
     @IsString()
     takerRunePublicKey: string;

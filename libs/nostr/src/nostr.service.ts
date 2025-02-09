@@ -1,12 +1,10 @@
-
 import { DatabaseSettingsService } from '@app/database/settings/settings.service';
-import { PUB_EVENT } from '@app/engine';
-import { DM } from '@app/execution';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import * as secp from "@noble/curves/secp256k1";
 import { createCipheriv, createDecipheriv, randomFillSync } from 'crypto';
 import { Event, finalizeEvent, getPublicKey, SimplePool } from 'nostr-tools';
 import * as WebSocket from 'ws';
+import { DM, PUB_EVENT } from './constants';
 
 @Injectable()
 export class NostrService implements OnModuleInit {
@@ -41,7 +39,7 @@ export class NostrService implements OnModuleInit {
         console.log('Nostr public key:', this.publicKey);
     }
 
-    async subscribeToOneEvent(filters: any, callback: any) {
+    subscribeToOneEvent(filters: any, callback: any) {
         const sub = this.pool.subscribeMany(this.relayUrls, filters, {
             onevent: (event: Event) => {
                 if (event.created_at * 1000 >= Date.now() - 5000) {
@@ -66,7 +64,7 @@ export class NostrService implements OnModuleInit {
                         if (event.kind === DM) {
                             event.content = this.decryptEventContent(event);
                         }
-                        callback(event.content);
+                        callback(event);
                     }
                 },
                 onclose() {
@@ -84,7 +82,7 @@ export class NostrService implements OnModuleInit {
             content: this.encryptContent(content, receiverPublicKey),
         };
 
-        await Promise.all(this.pool.publish(this.relayUrls, finalizeEvent(event, this.privateKey)));
+        await Promise.all(this.pool.publish(this.relayUrls, finalizeEvent(event, this.privateKey))).catch(console.log);
 
     }
 

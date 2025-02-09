@@ -1,18 +1,16 @@
-import { Module } from '@nestjs/common';
-import { RuneOrdersService } from './rune-orders.service';
-import { DatabaseModule } from '@app/database';
-import { NostrModule } from '@app/nostr';
 import { RunesModule } from '@app/blockchain/runes/runes.module';
-import { ClientsModule } from '../clients/clients.module';
+import { DatabaseModule } from '@app/database';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ClientsModule } from '../clients/clients.module';
+import { RuneOrdersService } from './rune-orders.service';
 
 @Module({
   imports: [
+    ConfigModule.forRoot(),
     DatabaseModule, 
-    NostrModule, 
     RunesModule, 
     ClientsModule,
-    ConfigModule.forRoot()
   ],
   providers: [RuneOrdersService],
   exports: [RuneOrdersService]
