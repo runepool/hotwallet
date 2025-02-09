@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, PrimaryColumn } from 'typeorm';
 
 export enum RuneOrderType {
   ASK = 'ask',
@@ -18,7 +18,7 @@ const BigIntTransformer = {
 
 @Entity()
 export class RuneOrder {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn('uuid')
   id: string;
 
   @Column()
@@ -27,17 +27,20 @@ export class RuneOrder {
   @Column('bigint', { transformer: BigIntTransformer })
   quantity: bigint;
 
-  @Column('bigint', { transformer: BigIntTransformer })
+  @Column('bigint', { transformer: BigIntTransformer, default: 0 })
   filledQuantity: bigint;
 
   @Column('bigint', { transformer: BigIntTransformer })
   price: bigint;
 
-  @Column({ type: 'enum', enum: OrderStatus })
+  @Column({ type: 'enum', enum: RuneOrderType })
+  type: RuneOrderType;
+
+  @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.OPEN })
   status: OrderStatus;
 
   @Column()
-  makerNostryKey: string;
+  makerNostrKey: string;
 
   @Column()
   makerAddress: string;

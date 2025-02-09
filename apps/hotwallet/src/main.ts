@@ -11,8 +11,8 @@ async function bootstrap() {
   const app = await NestFactory.create(HotWalletModule);
   // Swagger configuration
   const config = new DocumentBuilder()
-    .setTitle('P2P Decentralized Exchange API')
-    .setDescription('API documentation for the P2P Decentralized Exchange')
+    .setTitle('HotWallet API')
+    .setDescription('API documentation for the HotWallet')
     .setVersion('1.0')
     .build();
 

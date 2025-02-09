@@ -27,13 +27,16 @@ export class RuneOrder {
   @Column('bigint', { transformer: BigIntTransformer })
   quantity: bigint;
 
-  @Column('bigint', { transformer: BigIntTransformer })
+  @Column()
+  type: string;
+
+  @Column('bigint', { transformer: BigIntTransformer, default: 0 })
   filledQuantity: bigint;
 
   @Column('bigint', { transformer: BigIntTransformer })
   price: bigint;
 
-  @Column()
+  @Column({default: OrderStatus.OPEN})
   status: string;
 
   @CreateDateColumn()

@@ -4,7 +4,6 @@ import { Network } from 'bitcoinjs-lib';
 import { lastValueFrom } from 'rxjs';
 import { CpfpInfo, FeeRates, OutspendInfo, TxInfo, TxStatus, Utxo } from './types';
 
-const tracer = trace.getTracer('mempool-client');
 
 @Injectable()
 export class MempoolClient {

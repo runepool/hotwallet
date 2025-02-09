@@ -9,6 +9,7 @@ import { RuneOrdersController } from './rune-orders/rune-orders.controller';
 import { RuneOrdersModule } from "./rune-orders/rune-orders.module";
 import { SettingsController } from './settings/settings.controller';
 import { SettingsModule } from './settings/settings.module';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
   imports: [
@@ -17,7 +18,8 @@ import { SettingsModule } from './settings/settings.module';
     AccountModule,
     PendingTransactionsModule,
     TransactionsDbModule,
-    SettingsModule
+    SettingsModule,
+    ClientsModule
   ],
   controllers: [RuneOrdersController, AccountController, PendingTransactionController, SettingsController],
   providers: [],

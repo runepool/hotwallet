@@ -51,7 +51,7 @@ export class MakerGatewayService {
                         tradeId,
                         psbtBase64: base64EcondedPsbt
                     }
-                } as Message<SignRequest>), order.makerNostryKey);
+                } as Message<SignRequest>), order.makerNostrKey);
 
             }))
         }
@@ -101,7 +101,7 @@ export class MakerGatewayService {
                     }],
                     tradeId
                 }
-            } as Message<ReserveOrdersRequest>), runeOrder.makerNostryKey);
+            } as Message<ReserveOrdersRequest>), runeOrder.makerNostrKey);
 
         })
     }
