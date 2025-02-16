@@ -50,9 +50,6 @@ export class QuoteResponseDto {
   @ApiProperty({ description: 'Price of to token in from token', example: '10' })
   price: string;
 
-  @ApiProperty({ description: 'Network fee in sats', example: '1000' })
-  networkFee: string;
-
   @ApiProperty({ description: 'Whether there is enough liquidity for this trade', example: true })
   hasLiquidity: boolean;
 

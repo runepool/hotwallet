@@ -72,3 +72,21 @@ export class CreateTradeDto {
     @IsString()
     takerRunePublicKey: string;
 }
+
+
+export class ExecuteTradeDto {
+    @ApiProperty({
+        description: 'Signed base64 PSBT',
+        example: 'signedBase64Psbt'
+    })
+    @IsString()
+    signedBase64Psbt: string;
+
+
+    @ApiProperty({
+        description: 'Trade ID',
+        example: 'tradeId'
+    })
+    @IsString()
+    tradeId: string;
+}

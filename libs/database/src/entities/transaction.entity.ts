@@ -27,6 +27,9 @@ export class Transaction {
   @Column({ nullable: true })
   txid: string;
 
+  @Column({type:'text'})
+  reservedUtxos: string
+
   @Column()
   orders: string;
 

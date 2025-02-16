@@ -5,6 +5,7 @@ import { OrderStatus, RuneOrder, RuneOrderType } from '@app/exchange-database/en
 import { GetQuoteDto, QuoteResponseDto, OrderQuote } from '../dto/quote.dto';
 import { RunesService } from '@app/blockchain/runes/runes.service';
 import Decimal from 'decimal.js';
+import { Errors, OracleError } from 'libs/errors/errors';
 
 @Injectable()
 export class QuoteService {
@@ -52,6 +53,9 @@ export class QuoteService {
       let orderToAmount: bigint;
 
       if (isBuyingRunes) {
+        if (remainingFromAmount <= 1000) {
+          throw new OracleError(Errors.BASE_AMOUNT_LESS_THAN_DUST)
+        }
         // Converting BTC to Runes
         orderFromAmount = BigInt(new Decimal((availableAmount * order.price).toString()).div(10 ** runeInfo.decimals).floor().toFixed(0));
         if (orderFromAmount > remainingFromAmount) {
@@ -63,11 +67,11 @@ export class QuoteService {
       } else {
         // Converting Runes to BTC
         if (availableAmount > remainingFromAmount) {
-          orderToAmount = remainingFromAmount * order.price;
+          orderToAmount = BigInt(remainingFromAmount) * BigInt(order.price);
           orderFromAmount = remainingFromAmount;
         } else {
+          orderToAmount = BigInt(orderFromAmount) * BigInt(order.price);
           orderFromAmount = availableAmount;
-          orderToAmount = orderFromAmount * order.price;
         }
       }
 
@@ -86,22 +90,30 @@ export class QuoteService {
       if (remainingFromAmount <= 0n) break;
     }
 
+
     // Check if we have enough liquidity
     const hasLiquidity = remainingFromAmount <= 0n;
 
     // Calculate average price
-    let avgPrice =Number(usedOrders.reduce((prev, curr) => prev + BigInt(curr.price), 0n)) / usedOrders.length;
+    let avgPrice = Number(usedOrders.reduce((prev, curr) => prev + BigInt(curr.price), 0n)) / usedOrders.length;
 
-    // Estimate network fee
-    const networkFee = 1000n; // 1000 sats base fee
+
+    if (!isBuyingRunes) {
+      if (totalToAmount < 1000n) {
+        throw new OracleError(Errors.QUOTE_AMOUNT_LESS_THAN_DUST)
+      }
+    } else {
+      if (fromAmount - remainingFromAmount < 1000n) {
+        throw new OracleError(Errors.QUOTE_AMOUNT_LESS_THAN_DUST)
+      }
+    }
 
     return {
       from,
       to,
       fromAmount: (fromAmount - remainingFromAmount).toString(),
-      toAmount: totalToAmount.toString(),
       price: avgPrice.toString(),
-      networkFee: networkFee.toString(),
+      toAmount: totalToAmount.toString(),
       hasLiquidity,
       orders: usedOrders
     };

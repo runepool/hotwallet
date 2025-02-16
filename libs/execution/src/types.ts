@@ -36,6 +36,7 @@ export class Message<T> {
 export class ReserveOrdersResponse {
     status: 'success' | 'error';
     tradeId: string;
+    reservedUtxos: string[];
 }
 
 export class ReserveOrdersRequest {

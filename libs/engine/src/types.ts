@@ -14,14 +14,13 @@ interface SwapInfo {
 export class FillRuneOrderOffer {
     psbtBase64: string;
     takerInputsToSign: SignableInput[];
-    provider: string;
     fee: number;
     id: string;
 }
 
 export class SwapTransaction {
     signedBase64Psbt: string;
-    offerId: string;
+    tradeId: string;
 }
 
 export class SwapResult {

@@ -3,32 +3,24 @@ import { BitcoinService } from '@app/blockchain/bitcoin/bitcoin.service';
 import { SignableInput, UnspentOutput } from '@app/blockchain/bitcoin/types/UnspentOutput';
 import { appendUnspentOutputsAsNetworkFee, takeNetowrkFeeFromOutput } from '@app/blockchain/psbtUtils';
 import { RunesService } from '@app/blockchain/runes/runes.service';
-
 import { RuneInfo } from '@app/blockchain/runes/types';
-
+import { TransactionType } from '@app/database/entities/transaction.entity';
 import { OrderStatus, RuneOrder, RuneOrderType } from '@app/exchange-database/entities/rune-order.entity';
-import { TransactionStatus, Transaction as Trade } from '@app/exchange-database/entities/transaction.entity';
+import { Transaction as Trade, TransactionStatus } from '@app/exchange-database/entities/transaction.entity';
 import { RuneOrdersService } from '@app/exchange-database/rune-orders/rune-orders-database.service';
-import { NostrService } from '@app/nostr';
+import { TransactionsDbService } from '@app/exchange-database/transactions/transactions-database.service';
+import { MAKER_BONUS, PROTOCOL_FEE, PROTOCOL_FEE_OUTPUT } from '@app/nostr/constants';
 import { BitcoinWalletService } from '@app/wallet';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { ExecuteTradeDto } from 'apps/exchange/src/dto/trade.dto';
 import { Psbt, Transaction } from 'bitcoinjs-lib';
 import { randomUUID } from 'crypto';
 import Decimal from 'decimal.js';
 import { Errors, OracleError } from 'libs/errors/errors';
-import { Event } from 'nostr-tools';
 import { Edict, none, RuneId, Runestone } from 'runelib';
 import { MakerGatewayService } from './maker-gateway/maker-gateway.service';
-import { FillRuneOrderOffer, RuneFillRequest, SwapMessage, SwapResult, SwapTransaction, SelectedOrder } from './types';
-import { TransactionType } from '@app/database/entities/transaction.entity';
-import { TransactionsDbService } from '@app/exchange-database/transactions/transactions-database.service';
-
-export const PUB_EVENT = 69420;
-export const SUB_EVENT = 69421;
-export const DM = 4;
-export const MAKER_BONUS = 100;
-export const PROTOCOL_FEE = 100;
-export const PROTOCOL_FEE_OUTPUT = 'bc1pughzj2s7d2979z3vaf0reaszrx5pye9k8glwvvha7yh0nt64kgzsx83r0c';
+import { FillRuneOrderOffer, RuneFillRequest, SelectedOrder, SwapResult } from './types';
+import { calculateTransactionSize } from '@app/blockchain/bitcoin/utils';
 
 interface PreparePsbtResult {
     swapPsbt: Psbt;
@@ -39,6 +31,7 @@ interface PreparePsbtResult {
 
 @Injectable()
 export class RuneEngineService {
+
     constructor(
         private readonly orderService: RuneOrdersService,
         private readonly bitcoinService: BitcoinService,
@@ -46,42 +39,44 @@ export class RuneEngineService {
         private readonly runeService: RunesService,
         private readonly transactionsDbService: TransactionsDbService,
         private readonly blockchainService: BlockchainService,
-        private readonly nostrService: NostrService,
         private readonly makerGatewayService: MakerGatewayService
     ) { }
 
 
-    // async finalize(swap: SwapTransaction): Promise<SwapResult> {
-    //     const psbt = Psbt.fromBase64(swap.signedBase64Psbt);
-    //     const tx = psbt.extractTransaction();
-    //     const transaction = await this.transactionsDbService.findById(swap.offerId);
+    async finalize(swap: ExecuteTradeDto): Promise<SwapResult> {
+        const psbt = Psbt.fromBase64(swap.signedBase64Psbt);
+        const transaction = await this.transactionsDbService.findById(swap.tradeId);
 
-    //     if (!transaction) {
-    //         throw "Transaction not found";
-    //     }
+        if (!transaction) {
+            throw "Transaction not found";
+        }
 
-    //     const txid = await this.bitcoinService.broadcast(tx.toHex());
+        const makerPsbt = Psbt.fromBase64(transaction.psbt);
+        const finalPsbt = psbt.combine(makerPsbt);
+        const tx = finalPsbt.finalizeAllInputs().extractTransaction();
 
-    //     transaction.status = TransactionStatus.CONFIRMING;
-    //     transaction.txid = txid;
+        const txid = await this.bitcoinService.broadcast(tx.toHex());
 
-    //     try {
-    //         const orders = transaction.orders.split(",").map(async item => {
-    //             const [id, amount] = item.split(":");
-    //             const order = await this.orderService.getOrderById(id);
-    //             order.filledQuantity += BigInt(amount);
-    //             return order;
-    //         });
+        transaction.status = TransactionStatus.CONFIRMING;
+        transaction.txid = txid;
 
-    //         await this.orderService.save(await Promise.all(orders))
-    //         await this.transactionsDbService.create(transaction);
-    //     } catch (error) {
-    //         Logger.error("Could not update pending orders")
-    //     }
+        try {
+            const orders = transaction.orders.split(",").map(async item => {
+                const [id, amount] = item.split(":");
+                const order = await this.orderService.getOrderById(id);
+                order.filledQuantity += BigInt(amount);
+                return order;
+            });
 
-    //     return { txid, status: 'success' };
+            await this.orderService.save(await Promise.all(orders))
+            await this.transactionsDbService.save([transaction]);
+        } catch (error) {
+            Logger.error("Could not update pending orders")
+        }
 
-    // }
+        return { txid, status: 'success' };
+
+    }
 
     async process(fillRequest: RuneFillRequest): Promise<FillRuneOrderOffer> {
         try {
@@ -122,14 +117,14 @@ export class RuneEngineService {
         pendingTx.rune = req.rune;
         pendingTx.status = TransactionStatus.PENDING;
         pendingTx.type = TransactionType.SELL;
+        pendingTx.psbt = psbt.toBase64();
 
         const { id } = await this.transactionsDbService.create(pendingTx);
         Logger.log(`Offer: Rune${runeAmount} | Sats: ${req.amount}`);
         return {
             fee,
-            psbtBase64: psbt.toBase64(),
+            psbtBase64: swapPsbt.toBase64(),
             takerInputsToSign: buyerInputsToSign,
-            provider: await this.walletService.getPublicKey(),
             id
         }
     }
@@ -157,15 +152,15 @@ export class RuneEngineService {
         pendingTx.rune = req.rune;
         pendingTx.status = TransactionStatus.PENDING;
         pendingTx.type = TransactionType.BUY;
+        pendingTx.psbt = psbt.toBase64();
 
         const { id } = await this.transactionsDbService.create(pendingTx);
 
         Logger.log(`Offer: Rune${req.amount} | Sats: ${quoteAmount}`);
         return {
             fee,
-            psbtBase64: psbt.toBase64(),
+            psbtBase64: swapPsbt.toBase64(),
             takerInputsToSign: sellerInputsToSign,
-            provider: await this.walletService.getPublicKey(),
             id
         }
     }
@@ -235,23 +230,23 @@ export class RuneEngineService {
                     continue;
                 }
 
-                const { status } = await this.makerGatewayService.reserveOrder(order, remainingFillAmount, tradeId);
+                const { status, reservedUtxos } = await this.makerGatewayService.reserveOrder(order, remainingFillAmount, tradeId);
                 if (status === 'error') {
                     continue;
                 }
 
                 order.filledQuantity += remainingFillAmount;
-                selectedOrders.push({ order, usedAmount: remainingFillAmount, satAmount: BigInt(_quoteAmount), outputs });
+                const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
+                selectedOrders.push({ order, usedAmount: remainingFillAmount, satAmount: BigInt(_quoteAmount), outputs: selectedOutputs });
                 remainingFillAmount = 0n;
                 break;
             }
-
 
             if (balance < availableOrderAmountInSats) {
                 continue;
             }
 
-            const { status } = await this.makerGatewayService.reserveOrder(order, availableOrderAmount, tradeId);
+            const { status, reservedUtxos } = await this.makerGatewayService.reserveOrder(order, availableOrderAmount, tradeId);
             if (status === 'error') {
                 continue;
             }
@@ -260,15 +255,16 @@ export class RuneEngineService {
             order.filledQuantity += availableOrderAmount;
             order.status = OrderStatus.CLOSED;
             quoteAmount += BigInt(availableOrderAmountInSats);
-            selectedOrders.push({ order, usedAmount: availableOrderAmount, satAmount: BigInt(availableOrderAmountInSats), outputs });
+            const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
+            selectedOrders.push({ order, usedAmount: availableOrderAmount, satAmount: BigInt(availableOrderAmountInSats), outputs: selectedOutputs });
         }
 
         if (quoteAmount < 546n) {
-            throw "Quote amount is less than dust"
+            throw  new OracleError(Errors.QUOTE_AMOUNT_LESS_THAN_DUST);
         }
 
         if (remainingFillAmount > 0) {
-            throw "Insufficient funds to fill this order"
+            throw new OracleError(Errors.INSUFFICIENT_FUNDS);
         }
 
         return { quoteAmount, selectedOrders };
@@ -290,7 +286,7 @@ export class RuneEngineService {
 
         while (order = orders.shift()) {
             if (!runeBalances[order.makerAddress]) {
-                const { availableRuneAmount, unspentOutputs } = await this.getAvailableRuneInfo(order, runeInfo);
+                const { availableRuneAmount, unspentOutputs } = await this.getAvailableRuneInfo(order, runeInfo, order.makerPublicKey);
                 runeBalances[order.makerAddress] = {
                     balance: availableRuneAmount,
                     outputs: unspentOutputs
@@ -308,7 +304,7 @@ export class RuneEngineService {
                     continue;
                 }
 
-                const { status } = await this.makerGatewayService.reserveOrder(order, runeAmount, tradeId);
+                const { status, reservedUtxos } = await this.makerGatewayService.reserveOrder(order, runeAmount, tradeId);
                 if (status === 'error') {
                     continue;
                 }
@@ -316,7 +312,9 @@ export class RuneEngineService {
                 runeBalances[order.makerAddress].balance -= runeAmount;
                 order.filledQuantity = BigInt(order.filledQuantity)
                 order.filledQuantity += runeAmount;
-                selectedOrders.push({ order, usedAmount: runeAmount, outputs, satAmount: remainingFillAmount });
+                const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
+
+                selectedOrders.push({ order, usedAmount: runeAmount, outputs: selectedOutputs, satAmount: remainingFillAmount });
                 remainingFillAmount = 0n;
                 break;
             }
@@ -325,7 +323,7 @@ export class RuneEngineService {
                 continue;
             }
 
-            const { status } = await this.makerGatewayService.reserveOrder(order, runeAmount, tradeId);
+            const { status, reservedUtxos } = await this.makerGatewayService.reserveOrder(order, availableOrderAmount, tradeId);
             if (status === 'error') {
                 continue;
             }
@@ -335,7 +333,8 @@ export class RuneEngineService {
             order.filledQuantity += availableOrderAmount;
             order.status = OrderStatus.CLOSED;
             runeAmount += BigInt(availableOrderAmount);
-            selectedOrders.push({ order, usedAmount: availableOrderAmount, outputs, satAmount: BigInt(availableOrderAmountInSats) });
+            const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
+            selectedOrders.push({ order, usedAmount: availableOrderAmount, outputs: selectedOutputs, satAmount: BigInt(availableOrderAmountInSats) });
         }
 
         if (remainingFillAmount > 0) {
@@ -383,7 +382,6 @@ export class RuneEngineService {
             oderGroup[order.order.makerAddress].push(order);
         }
 
-        const indexOffset = hasRuneChange ? 1 : 0;
         for (const [makerAddress, selectedOrders] of Object.entries(oderGroup)) {
             const totalRuneAmount = selectedOrders.reduce((prev, curr) => prev + curr.usedAmount, 0n);
             swapPsbt.addOutput({
@@ -391,7 +389,7 @@ export class RuneEngineService {
                 value: 546
             });
             runeSatsChange -= 546n;
-            runestone.edicts.push(new Edict(runeId, BigInt(totalRuneAmount), indexOffset + swapPsbt.txOutputs.length - 1));
+            runestone.edicts.push(new Edict(runeId, BigInt(totalRuneAmount), swapPsbt.txOutputs.length - 1));
         }
 
         swapPsbt.addOutput({
@@ -400,10 +398,54 @@ export class RuneEngineService {
         });
 
 
+        const fundingInputs: UnspentOutput[] = [];
+        for (const [makerAddress, selectedOrders] of Object.entries(oderGroup)) {
+            const { outputs } = selectedOrders[0];
+            let totalAmountNeeded = selectedOrders.reduce((prev, curr) => prev + Number(curr.usedAmount), 0);
+            let totalAmountUsed = 0;
+            for (const output of outputs) {
+                const existingOutput = fundingInputs.find(item => item.location === output.location);
+                if (!existingOutput) {
+                    fundingInputs.push(output);
+                    totalAmountUsed += output.amount;
+                }
+            }
+
+            const change = totalAmountUsed - totalAmountNeeded;
+            if (change < 0) {
+                throw new OracleError(Errors.INSUFFICIENT_RUNE_AMOUNT)
+            };
+
+            if (change > 546) {
+                swapPsbt.addOutput({
+                    address: makerAddress,
+                    value: change
+                });
+            }
+        }
+
+        const buyerInputsToSign: SignableInput[] = [];
+        for (const output of fundingInputs) {
+            swapPsbt.addInput(output.toInput());
+            buyerInputsToSign.push({ index: swapPsbt.data.inputs.length - 1, signerAddress: output.address, singerPublicKey: output.publicKey, location: output.location });
+        }
+
+        const feeTx = swapPsbt.clone().addOutput({
+            address: req.takerPaymentAddress,
+            value: 1000
+        }).addOutput({
+            address: PROTOCOL_FEE_OUTPUT,
+            value: 1000
+        });
+
+        const txSize = calculateTransactionSize(feeTx.data.inputs, feeTx.txOutputs, []);
+        const feeRate = await this.bitcoinService.getFeeRate();
+        const fee = Math.ceil(feeRate * txSize) + 1000;
+
         const makerFee = new Decimal(quoteAmount.toString()).mul(MAKER_BONUS).div(10_000).floor().toFixed(0);
         const protocolFee = new Decimal(quoteAmount.toString()).mul(PROTOCOL_FEE).div(10_000).floor().toFixed(0);
         const totalFee = new Decimal(makerFee).plus(protocolFee).toFixed();
-        const netAmount = new Decimal(quoteAmount.toString()).minus(totalFee).plus(runeSatsChange.toString());
+        const netAmount = new Decimal(quoteAmount.toString()).minus(totalFee).plus(runeSatsChange.toString()).sub(fee).toFixed(0);
 
         // The seller nbtc 
         swapPsbt.addOutput({
@@ -411,39 +453,12 @@ export class RuneEngineService {
             value: Number(netAmount)
         })
 
-        const amountOutputIndex = swapPsbt.txOutputs.length - 1;
-
         swapPsbt.addOutput({
             address: PROTOCOL_FEE_OUTPUT,
-            value: Number(protocolFee)
+            value: Number(+protocolFee + 1000)
         });
 
-        const fundingInputs: UnspentOutput[] = [];
-
-        for (const [_, selectedOrders] of Object.entries(oderGroup)) {
-            const { outputs } = selectedOrders[0];
-            for (const output of outputs) {
-                const existingOutput = fundingInputs.find(item => item.location === output.location);
-                if (!existingOutput) {
-                    fundingInputs.push(output);
-                }
-            }
-        }
-
-
-        const buyerInputsToSign: SignableInput[] = [];
-        const feeRate = await this.bitcoinService.getFeeRate();
-        const { fee, psbt } = takeNetowrkFeeFromOutput(swapPsbt,
-            amountOutputIndex,
-            feeRate + 2,
-            await this.walletService.getAddress(),
-            fundingInputs,
-            buyerInputsToSign,
-        );
-
-        console.log(Transaction.fromBuffer(swapPsbt.data.getTransaction()).virtualSize());
-
-        return { swapPsbt: psbt, sellerInputsToSign, buyerInputsToSign, fee };
+        return { swapPsbt, sellerInputsToSign, buyerInputsToSign, fee };
     }
 
     async prepareBuyPsbt(req: RuneFillRequest, runeInfo: RuneInfo, runeAmount: bigint, orders: SelectedOrder[]): Promise<PreparePsbtResult> {
@@ -461,7 +476,7 @@ export class RuneEngineService {
         const totalFee = new Decimal(makerFee).plus(protocolFee).toFixed(0);
         const netAmount = new Decimal(runeAmount.toString()).minus(totalFee).toFixed(0);
 
-
+        // The taker edict
         runestone.edicts.push(new Edict(runeId, BigInt(netAmount), swapPsbt.txOutputs.length - 1));
         const oderGroup: { [maker_address: string]: SelectedOrder[] } = {};
 
@@ -487,6 +502,7 @@ export class RuneEngineService {
                     address: makerAddress,
                     value: 546
                 });
+                // Rune change edict
                 runestone.edicts.push(new Edict(runeId, BigInt(change), swapPsbt.txOutputs.length - 1));
             }
         }
@@ -496,6 +512,7 @@ export class RuneEngineService {
                 address: PROTOCOL_FEE_OUTPUT,
                 value: 546
             });
+            // Protocol fee edict
             runestone.edicts.push(new Edict(runeId, BigInt(protocolFee), swapPsbt.txOutputs.length - 1));
         }
 
@@ -513,11 +530,6 @@ export class RuneEngineService {
             });
         }
 
-        swapPsbt.addOutput({
-            address: await this.walletService.getAddress(),
-            value: Number(req.amount)
-        });
-
         // We take a flat 1000 sat fee
         swapPsbt.addOutput({
             address: PROTOCOL_FEE_OUTPUT,
@@ -533,8 +545,8 @@ export class RuneEngineService {
         return { swapPsbt, buyerInputsToSign, fee, sellerInputsToSign };
     }
 
-    async getAvailableRuneInfo(order: RuneOrder, runeInfo: RuneInfo) {
-        const unspentOutputs = await this.runeService.getRunesUnspentOutputs(order.makerAddress, runeInfo.rune_id);
+    async getAvailableRuneInfo(order: RuneOrder, runeInfo: RuneInfo, publicKey?: string) {
+        const unspentOutputs = await this.runeService.getRunesUnspentOutputs(order.makerAddress, runeInfo.rune_id, publicKey);
         const availableRuneAmount = unspentOutputs.reduce((prev, curr) => {
             const runeIdIndex = curr.runeIds.findIndex(item => item === runeInfo.rune_id);
             if (runeIdIndex === -1) {

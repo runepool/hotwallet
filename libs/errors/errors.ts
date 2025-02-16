@@ -145,6 +145,18 @@ export const Errors = {
   PUB_KEY_MESSING: {
     code: 1034,
     message: `Public key is missing`
+  },
+  QUOTE_AMOUNT_LESS_THAN_DUST: {
+    code: 1035,
+    message: `Quote amount is less than dust`
+  },
+  BASE_AMOUNT_LESS_THAN_DUST: {
+    code: 1036,
+    message: `Base amount is less than dust`
+  },
+  INSUFFICIENT_FUNDS: {
+    code: 1037,
+    message: `Insufficient funds`
   }
 };
 

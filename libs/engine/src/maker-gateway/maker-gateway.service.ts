@@ -2,12 +2,13 @@ import { BitcoinService } from '@app/blockchain/bitcoin/bitcoin.service';
 import { SignableInput } from '@app/blockchain/bitcoin/types/UnspentOutput';
 import { RunesService } from '@app/blockchain/runes/runes.service';
 import { RuneOrder } from '@app/exchange-database/entities/rune-order.entity';
-import { DM } from '@app/execution';
 import { ReserveOrdersResponse, ReserveOrdersRequest, Message, SignResponse, SignRequest } from '@app/execution/types';
 import { NostrService } from '@app/nostr';
+import { DM } from '@app/nostr/constants';
 import { Injectable } from '@nestjs/common';
 import { Psbt } from 'bitcoinjs-lib';
-import { Event } from 'nostr-tools';
+import { Event, getPublicKey } from 'nostr-tools';
+import { SubCloser } from 'nostr-tools/lib/types/abstract-pool';
 
 
 @Injectable()
@@ -23,25 +24,34 @@ export class MakerGatewayService {
 
         const partials: Promise<SignResponse>[] = [];
         for (const order of orders) {
-            partials.push(new Promise((resolve) => {
+            partials.push(new Promise(async (resolve) => {
                 this.nostrService.subscribeToOneEvent([
                     {
                         kinds: [DM],
                         '#p': [this.nostrService.publicKey],
                     }
-                ], async (event: Event) => {
+                ], async (event: Event, sub: SubCloser) => {
                     try {
                         const message = JSON.parse(event.content) as Message<SignResponse>;
                         if (message.type === 'sign_response') {
+                            sub.close();
                             resolve(message.data);
+
                         }
                     } catch (error) {
+                        sub.close();
                         resolve({
                             status: 'error',
                             tradeId,
                             signedPsbtBase64: null
                         });
                     }
+                })
+
+                await new Promise<void>((res) => {
+                    setTimeout(() => {
+                        res();
+                    }, 1000);
                 })
 
                 this.nostrService.publishDirectMessage(JSON.stringify({
@@ -51,7 +61,7 @@ export class MakerGatewayService {
                         tradeId,
                         psbtBase64: base64EcondedPsbt
                     }
-                } as Message<SignRequest>), order.makerNostrKey);
+                } as Message<SignRequest>), order.makerNostrKey.slice(2));
 
             }))
         }
@@ -88,7 +98,8 @@ export class MakerGatewayService {
                 } catch (error) {
                     resolve({
                         status: 'error',
-                        tradeId
+                        tradeId,
+                        reservedUtxos: []
                     });
                 }
             })
@@ -96,7 +107,7 @@ export class MakerGatewayService {
             await new Promise<void>((res) => {
                 setTimeout(() => {
                     res();
-                }, 200);
+                }, 1000);
             })
             this.nostrService.publishDirectMessage(JSON.stringify({
                 type: 'reserve_request',

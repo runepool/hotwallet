@@ -24,10 +24,12 @@ export class TransactionsDbService {
     }
 
     async findById(id: string): Promise<Transaction | null> {
+        if (!id) return null;
         return await this.transactionRepository.findOneBy({ id });
     }
 
     async findByTxid(id: string): Promise<Transaction | null> {
+        if (!id) return null;
         return await this.transactionRepository.findOneBy({ id });
     }
 

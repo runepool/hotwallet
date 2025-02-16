@@ -10,20 +10,38 @@ import { EntityManager } from 'typeorm/entity-manager/EntityManager';
 import { Message, ReserveOrdersRequest, ReserveOrdersResponse, SignRequest, SignResponse } from '../types';
 import { RunesService } from '@app/blockchain/runes/runes.service';
 import { BlockchainService } from '@app/blockchain';
-import { UnspentOutput } from '@app/blockchain/bitcoin/types/UnspentOutput';
 import { RuneOrder } from '@app/database/entities/rune-order.entity';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class EventHandlerService {
 
-    private reservedUtxos: { [utxo: string]: string } = {};
+    private reservedUtxos: {
+        [utxo: string]: {
+            tradeId: string,
+            timestamp: number
+        }
+    } = {};
 
     constructor(
         @InjectEntityManager() private readonly manager: EntityManager,
         private readonly bitcoinService: BlockchainService,
         private readonly runeService: RunesService,
         private readonly walletService: BitcoinWalletService,
-        private readonly nostrService: NostrService) { }
+        private readonly nostrService: NostrService) {
+    }
+
+    @Cron(CronExpression.EVERY_MINUTE)
+    async clearReservedUtxos() {
+        const RESERVATION_TIMEOUT = 2 * 60 * 1000; // 5 minutes in milliseconds
+        const now = Date.now();
+        
+        for (const [utxo, reservation] of Object.entries(this.reservedUtxos)) {
+            if (now - reservation.timestamp > RESERVATION_TIMEOUT) {
+                delete this.reservedUtxos[utxo];
+            }
+        }
+    }
 
     async handleSignRequest(message: Message<SignRequest>, event: Event) {
         const data = message.data;
@@ -44,18 +62,20 @@ export class EventHandlerService {
 
     async handleReserveRequest(message: Message<ReserveOrdersRequest>, event: Event) {
         try {
-            await this.reserveOrders(message.data);
+            // TODO: implement lock await h
+            const reservedUtxos = await this.reserveOrders(message.data);
             await this.nostrService.publishDirectMessage(JSON.stringify(
                 Object.assign(new Message<ReserveOrdersResponse>(), {
                     type: 'reserve_response',
                     data: {
                         tradeId: message.data.tradeId,
-                        status: 'success'
+                        status: 'success',
+                        reservedUtxos
                     }
                 } as Message<ReserveOrdersResponse>)
             ), event.pubkey);
         } catch (error) {
-            Logger.error(error);
+           console.log(error);
             await this.nostrService.publishDirectMessage(JSON.stringify(
                 Object.assign(new Message<ReserveOrdersResponse>(), {
                     type: 'reserve_response',
@@ -87,13 +107,13 @@ export class EventHandlerService {
             });
         }
 
-        // TODO: Reserve UTXOs
-        const orderType = selectedOrders[0].type;
+        const orderType = selectedOrders[0].order.type;
 
+        let reservedUtxos: string[];
         if (orderType === 'ask') {
-            await this.reserverAskUTXOs(fillOrderRequest.tradeId, selectedOrders);
+            reservedUtxos = await this.reserverAskUTXOs(fillOrderRequest.tradeId, selectedOrders);
         } else if (orderType === 'bid') {
-            await this.reserveBidUTXOs(fillOrderRequest.tradeId, selectedOrders);
+            reservedUtxos = await this.reserveBidUTXOs(fillOrderRequest.tradeId, selectedOrders);
         }
 
         const runeAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount, 0n).toString();
@@ -106,15 +126,24 @@ export class EventHandlerService {
         pendingTx.confirmations = 0;
         pendingTx.rune = selectedOrders[0].order.rune;
         pendingTx.status = TransactionStatus.PENDING;
+        pendingTx.reservedUtxos = reservedUtxos.join(",");
         pendingTx.type = selectedOrders[0].type === 'ask' ? TransactionType.BUY : TransactionType.SELL;
-        return this.manager.transaction(async manager => {
+        pendingTx.reservedUtxos = reservedUtxos.join(";");
+        const result = await this.manager.transaction(async manager => {
             await manager.save<RuneOrder>(selectedOrders.map(item => item.order));
             await manager.save(pendingTx);
-        });
-    }
-    async reserveBidUTXOs(tradeId: string, selectedOrders: { order: RuneOrder; usedAmount: bigint }[]) {
-        let totalAmount = selectedOrders.reduce((prev, curr) => prev += (curr.usedAmount), 0n);
 
+            return reservedUtxos
+        });
+
+        return result;
+    }
+    async reserveBidUTXOs(tradeId: string, selectedOrders: { order: RuneOrder; usedAmount: bigint }[]): Promise<string[]> {
+        const result = [];
+        const runeInfo = await this.runeService.getRuneInfo(selectedOrders[0].order.rune);
+
+        let totalAmount = selectedOrders.reduce((prev, curr) => prev += (curr.usedAmount * curr.order.price), 0n);
+        totalAmount = totalAmount / BigInt(10 ** runeInfo.decimals);
         const address = await this.walletService.getAddress();
         const pubkey = await this.walletService.getPublicKey();
         let utxos = await this.bitcoinService.getValidFundingInputs(address, pubkey);
@@ -131,17 +160,20 @@ export class EventHandlerService {
                 throw new Error('No more UTXOs available');
             }
             totalAmount -= BigInt(utxo.amount);
-            this.reservedUtxos[utxo.location] = tradeId;
+            this.reservedUtxos[utxo.location] = { tradeId, timestamp: Date.now() };
+            result.push(utxo.location);
         }
+        return result;
     }
 
-    async reserverAskUTXOs(tradeId: string, selectedOrders: { order: RuneOrder; usedAmount: bigint }[]) {
-        let totalAmount = BigInt(selectedOrders.reduce((prev, curr) => prev += (curr.usedAmount * curr.order.price), 0n));
+    async reserverAskUTXOs(tradeId: string, selectedOrders: { order: RuneOrder; usedAmount: bigint }[]): Promise<string[]> {
+        const result = [];
+        let totalAmount = BigInt(selectedOrders.reduce((prev, curr) => prev += (curr.usedAmount), 0n));
         const runeInfo = await this.runeService.getRuneInfo(selectedOrders[0].order.rune);
-
         const address = await this.walletService.getAddress();
 
         let utxos = await this.runeService.getRunesUnspentOutputs(address, runeInfo.rune_id);
+        utxos = utxos.filter(item => !Object.keys(this.reservedUtxos).includes(item.location));
         const availableAmount = utxos.reduce((prev, curr) => {
             const runeIdIndex = curr.runeIds.findIndex(item => item === runeInfo.rune_id);
             if (runeIdIndex === -1) {
@@ -165,9 +197,11 @@ export class EventHandlerService {
                 throw new Error('Rune not found in UTXO');
             }
             totalAmount -= utxo.runeBalances[runeIdIndex];
-            this.reservedUtxos[utxo.location] = tradeId;
+            this.reservedUtxos[utxo.location] = { tradeId, timestamp: Date.now() };
+            result.push(utxo.location);
         }
 
+        return result;
     }
 
 }

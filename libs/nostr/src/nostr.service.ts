@@ -46,8 +46,7 @@ export class NostrService implements OnModuleInit {
                     if (event.kind === DM) {
                         event.content = this.decryptEventContent(event);
                     }
-                    sub.close();
-                    callback(event.content);
+                    callback(event, sub);
                 }
             },
             onclose() {
@@ -86,10 +85,10 @@ export class NostrService implements OnModuleInit {
 
     }
 
-    encryptContent(message: string, makerPubkey: string) {
+    encryptContent(message: string, pubKey: string) {
 
         // Derive shared secret
-        const sharedPoint = secp.secp256k1.getSharedSecret(this.privateKey, '02' + makerPubkey);
+        const sharedPoint = secp.secp256k1.getSharedSecret(this.privateKey, '02' + pubKey);
         const sharedX = sharedPoint.slice(1, 33); // Extract x-coordinate
 
         // Generate random IV

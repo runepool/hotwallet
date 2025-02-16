@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
 
 export enum TransactionStatus {
   PENDING = 'pending',
@@ -30,6 +30,9 @@ export class Transaction {
   @Column()
   price: string;
 
+  @Column()
+  psbt: string;
+
   @Column({
     type: 'enum',
     enum: TransactionStatus,
@@ -39,4 +42,7 @@ export class Transaction {
 
   @Column({ default: 0 })
   confirmations: number;
+
+  @CreateDateColumn()
+  createdAt: Date;
 }
