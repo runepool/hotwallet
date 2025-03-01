@@ -1,7 +1,7 @@
 import { BlockchainService } from '@app/blockchain';
 import { BitcoinService } from '@app/blockchain/bitcoin/bitcoin.service';
 import { SignableInput, UnspentOutput } from '@app/blockchain/bitcoin/types/UnspentOutput';
-import { appendUnspentOutputsAsNetworkFee, takeNetowrkFeeFromOutput } from '@app/blockchain/psbtUtils';
+import { appendUnspentOutputsAsNetworkFee, sumInputsValues, takeNetowrkFeeFromOutput } from '@app/blockchain/psbtUtils';
 import { RunesService } from '@app/blockchain/runes/runes.service';
 import { RuneInfo } from '@app/blockchain/runes/types';
 import { TransactionType } from '@app/database/entities/transaction.entity';
@@ -219,15 +219,32 @@ export class RuneEngineService {
             const { balance, outputs } = satBalance[order.makerAddress];
 
             const availableOrderAmount = BigInt(order.quantity - order.filledQuantity);
-            const availableOrderAmountInSats = Number(availableOrderAmount * BigInt(order.price)) / 10 ** runeInfo.decimals;
+            
+            // Use Decimal.js for precise calculations
+            const decimalPrice = new Decimal(order.price.toString());
+            const decimalAvailableAmount = new Decimal(availableOrderAmount.toString());
+            const decimalDecimals = new Decimal(10).pow(runeInfo.decimals);
+            
+            // Calculate available amount in sats with proper precision
+            const availableOrderAmountInSats = decimalAvailableAmount
+                .times(decimalPrice)
+                .dividedBy(decimalDecimals);
 
             if (availableOrderAmount >= remainingFillAmount) {
-                let _quoteAmount = Math.floor(Number(remainingFillAmount) * Number(order.price)) / 10 ** runeInfo.decimals;
-                if (_quoteAmount < 1) {
+                // Calculate quote amount with proper precision
+                const decimalRemainingFill = new Decimal(remainingFillAmount.toString());
+                const quoteAmountDecimal = decimalRemainingFill
+                    .times(decimalPrice)
+                    .dividedBy(decimalDecimals)
+                    .floor(); // Floor to ensure we don't exceed
+                
+                // Skip if quote amount is less than dust
+                if (quoteAmountDecimal.lessThan(546)) {
                     break;
                 }
-                quoteAmount = BigInt(_quoteAmount);
-                if (balance < quoteAmount) {
+                
+                const _quoteAmount = BigInt(quoteAmountDecimal.toString());
+                if (balance < _quoteAmount) {
                     continue;
                 }
 
@@ -238,12 +255,15 @@ export class RuneEngineService {
 
                 order.filledQuantity += remainingFillAmount;
                 const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
-                selectedOrders.push({ order, usedAmount: remainingFillAmount, satAmount: BigInt(_quoteAmount), outputs: selectedOutputs });
+                selectedOrders.push({ order, usedAmount: remainingFillAmount, satAmount: _quoteAmount, outputs: selectedOutputs });
+                quoteAmount += _quoteAmount;
                 remainingFillAmount = 0n;
                 break;
             }
 
-            if (balance < availableOrderAmountInSats) {
+            // Convert to BigInt to ensure we don't lose precision
+            const availableSatsAmount = BigInt(availableOrderAmountInSats.floor().toString());
+            if (balance < availableSatsAmount) {
                 continue;
             }
 
@@ -255,13 +275,13 @@ export class RuneEngineService {
             remainingFillAmount -= availableOrderAmount;
             order.filledQuantity += availableOrderAmount;
             order.status = OrderStatus.CLOSED;
-            quoteAmount += BigInt(availableOrderAmountInSats);
+            quoteAmount += availableSatsAmount;
             const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
-            selectedOrders.push({ order, usedAmount: availableOrderAmount, satAmount: BigInt(availableOrderAmountInSats), outputs: selectedOutputs });
+            selectedOrders.push({ order, usedAmount: availableOrderAmount, satAmount: availableSatsAmount, outputs: selectedOutputs });
         }
 
         if (quoteAmount < 546n) {
-            throw  new OracleError(Errors.QUOTE_AMOUNT_LESS_THAN_DUST);
+            throw new OracleError(Errors.INSUFFICIENT_FUNDS);
         }
 
         if (remainingFillAmount > 0) {
@@ -297,10 +317,28 @@ export class RuneEngineService {
             const { balance, outputs } = runeBalances[order.makerAddress];
 
             const availableOrderAmount = order.quantity - order.filledQuantity;
-            const availableOrderAmountInSats = Number(availableOrderAmount * order.price) / 10 ** runeInfo.decimals;
+            
+            // Use Decimal.js for precise calculations
+            const decimalPrice = new Decimal(order.price.toString());
+            const decimalAvailableAmount = new Decimal(availableOrderAmount.toString());
+            const decimalDecimals = new Decimal(10).pow(runeInfo.decimals);
+            
+            // Calculate available amount in sats with proper precision
+            const availableOrderAmountInSats = decimalAvailableAmount
+                .times(decimalPrice)
+                .dividedBy(decimalDecimals)
+                .toNumber();
 
-            if (availableOrderAmountInSats >= remainingFillAmount) {
-                runeAmount = BigInt(Math.ceil(Number(remainingFillAmount) / Number(order.price)) * 10 ** runeInfo.decimals) as bigint;
+            if (availableOrderAmount >= remainingFillAmount) {
+                // Calculate required rune amount with proper precision
+                const decimalRemainingFill = new Decimal(remainingFillAmount.toString());
+                const runeAmountDecimal = decimalRemainingFill
+                    .dividedBy(decimalPrice)
+                    .times(decimalDecimals)
+                    .ceil();
+                
+                runeAmount = BigInt(runeAmountDecimal.toString());
+                
                 if (balance < runeAmount) {
                     continue;
                 }
@@ -311,7 +349,6 @@ export class RuneEngineService {
                 }
 
                 runeBalances[order.makerAddress].balance -= runeAmount;
-                order.filledQuantity = BigInt(order.filledQuantity)
                 order.filledQuantity += runeAmount;
                 const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
 
@@ -329,17 +366,26 @@ export class RuneEngineService {
                 continue;
             }
 
-            remainingFillAmount -= BigInt(Math.ceil(availableOrderAmountInSats));
+            // Convert to BigInt after ceiling to ensure we don't underestimate
+            const satAmountBigInt = BigInt(Math.ceil(availableOrderAmountInSats));
+            remainingFillAmount -= satAmountBigInt;
+            
             runeBalances[order.makerAddress].balance -= availableOrderAmount;
             order.filledQuantity += availableOrderAmount;
             order.status = OrderStatus.CLOSED;
-            runeAmount += BigInt(availableOrderAmount);
+            runeAmount += availableOrderAmount;
+            
             const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
-            selectedOrders.push({ order, usedAmount: availableOrderAmount, outputs: selectedOutputs, satAmount: BigInt(availableOrderAmountInSats) });
+            selectedOrders.push({ 
+                order, 
+                usedAmount: availableOrderAmount, 
+                outputs: selectedOutputs, 
+                satAmount: satAmountBigInt 
+            });
         }
 
         if (remainingFillAmount > 0) {
-            throw "Insufficient funds to fill this order"
+            throw new OracleError(Errors.INSUFFICIENT_FUNDS);
         }
 
         return { runeAmount, selectedOrders };
@@ -400,9 +446,14 @@ export class RuneEngineService {
 
 
         const fundingInputs: UnspentOutput[] = [];
+        let totalMakerFee = 0;
         for (const [makerAddress, selectedOrders] of Object.entries(oderGroup)) {
+            // All orders hold the same outputs 
             const { outputs } = selectedOrders[0];
-            let totalAmountNeeded = selectedOrders.reduce((prev, curr) => prev + Number(curr.usedAmount), 0);
+            let totalSatAmount = selectedOrders.reduce((prev, curr) => prev + Number(curr.satAmount), 0);
+            const makerFee = new Decimal(totalSatAmount.toString()).mul(MAKER_BONUS).div(10_000).floor().toFixed(0);
+            totalSatAmount -= +makerFee;
+            totalMakerFee += +makerFee;
             let totalAmountUsed = 0;
             for (const output of outputs) {
                 const existingOutput = fundingInputs.find(item => item.location === output.location);
@@ -412,7 +463,7 @@ export class RuneEngineService {
                 }
             }
 
-            const change = totalAmountUsed - totalAmountNeeded;
+            const change = totalAmountUsed - totalSatAmount;
             if (change < 0) {
                 throw new OracleError(Errors.INSUFFICIENT_RUNE_AMOUNT)
             };
@@ -443,9 +494,8 @@ export class RuneEngineService {
         const feeRate = await this.bitcoinService.getFeeRate();
         const fee = Math.ceil(feeRate * txSize) + 1000;
 
-        const makerFee = new Decimal(quoteAmount.toString()).mul(MAKER_BONUS).div(10_000).floor().toFixed(0);
         const protocolFee = new Decimal(quoteAmount.toString()).mul(PROTOCOL_FEE).div(10_000).floor().toFixed(0);
-        const totalFee = new Decimal(makerFee).plus(protocolFee).toFixed();
+        const totalFee = new Decimal(totalMakerFee).plus(protocolFee).toFixed();
         const netAmount = new Decimal(quoteAmount.toString()).minus(totalFee).plus(runeSatsChange.toString()).sub(fee).toFixed(0);
 
         // The seller nbtc 
@@ -459,6 +509,11 @@ export class RuneEngineService {
             value: Number(+protocolFee + 1000)
         });
 
+        const totalIn = swapPsbt.data.inputs.reduce(sumInputsValues(swapPsbt), 0);
+        const totalOut = swapPsbt.txOutputs.reduce((prev, curr) => prev + curr.value, 0);
+        if (totalIn < totalOut) {
+            throw new OracleError(Errors.INSUFFICIENT_FUNDS)
+        }
         return { swapPsbt, sellerInputsToSign, buyerInputsToSign, fee };
     }
 

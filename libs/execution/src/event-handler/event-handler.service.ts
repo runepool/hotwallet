@@ -23,12 +23,37 @@ export class EventHandlerService {
         }
     } = {};
 
+    private locks: { [lockId: string]: boolean } = {};
+    
+    // Reservation timeout in milliseconds (1 minute)
+    private readonly RESERVATION_TIMEOUT = 1 * 60 * 1000;
+
     constructor(
         @InjectEntityManager() private readonly manager: EntityManager,
         private readonly bitcoinService: BlockchainService,
         private readonly runeService: RunesService,
         private readonly walletService: BitcoinWalletService,
         private readonly nostrService: NostrService) {
+            
+        // Set up periodic cleanup of expired reservations
+        setInterval(() => this.cleanupExpiredReservations(), 60 * 1000); // Run every minute
+    }
+
+    /**
+     * Cleans up expired UTXO reservations
+     */
+    private cleanupExpiredReservations() {
+        const now = Date.now();
+        const expiredUtxos = Object.entries(this.reservedUtxos)
+            .filter(([_, data]) => now - data.timestamp > this.RESERVATION_TIMEOUT)
+            .map(([utxo]) => utxo);
+            
+        if (expiredUtxos.length > 0) {
+            console.log(`Cleaning up ${expiredUtxos.length} expired UTXO reservations`);
+            expiredUtxos.forEach(utxo => {
+                delete this.reservedUtxos[utxo];
+            });
+        }
     }
 
     @Cron(CronExpression.EVERY_MINUTE)
@@ -62,26 +87,43 @@ export class EventHandlerService {
 
     async handleReserveRequest(message: Message<ReserveOrdersRequest>, event: Event) {
         try {
-            // TODO: implement lock await h
-            const reservedUtxos = await this.reserveOrders(message.data);
-            await this.nostrService.publishDirectMessage(JSON.stringify(
-                Object.assign(new Message<ReserveOrdersResponse>(), {
-                    type: 'reserve_response',
-                    data: {
-                        tradeId: message.data.tradeId,
-                        status: 'success',
-                        reservedUtxos
-                    }
-                } as Message<ReserveOrdersResponse>)
-            ), event.pubkey);
+            // Implement a simple lock mechanism
+            const lockId = `reserve-${message.data.tradeId}`;
+            if (this.locks && this.locks[lockId]) {
+                throw new Error('Another reservation is in progress with this tradeId');
+            }
+            
+            this.locks = this.locks || {};
+            this.locks[lockId] = true;
+            
+            try {
+                const reservedUtxos = await this.reserveOrders(message.data);
+                await this.nostrService.publishDirectMessage(JSON.stringify(
+                    Object.assign(new Message<ReserveOrdersResponse>(), {
+                        type: 'reserve_response',
+                        data: {
+                            tradeId: message.data.tradeId,
+                            status: 'success',
+                            reservedUtxos
+                        }
+                    } as Message<ReserveOrdersResponse>)
+                ), event.pubkey);
+            } finally {
+                // Always release the lock
+                delete this.locks[lockId];
+            }
         } catch (error) {
-           console.log(error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error during reservation';
+            console.error(`Reserve error: ${errorMessage}`, error);
+            
             await this.nostrService.publishDirectMessage(JSON.stringify(
                 Object.assign(new Message<ReserveOrdersResponse>(), {
                     type: 'reserve_response',
                     data: {
                         tradeId: message.data.tradeId,
-                        status: 'error'
+                        status: 'error',
+                        reservedUtxos: [],
+                        error: errorMessage
                     }
                 } as Message<ReserveOrdersResponse>)
             ), event.pubkey);

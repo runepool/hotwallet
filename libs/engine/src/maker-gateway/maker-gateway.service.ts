@@ -82,7 +82,17 @@ export class MakerGatewayService {
     }
 
     async reserveOrder(runeOrder: RuneOrder, orderAmount: bigint, tradeId: string): Promise<ReserveOrdersResponse> {
-        return new Promise<ReserveOrdersResponse>(async (resolve) => {
+        return new Promise<ReserveOrdersResponse>((resolve) => {
+            // Set a timeout to prevent hanging promises
+            const timeoutId = setTimeout(() => {
+                resolve({
+                    status: 'error',
+                    tradeId,
+                    reservedUtxos: [],
+                    error: 'Request timed out'
+                });
+            }, 15000); // 15 seconds timeout
+
             this.nostrService.subscribeToOneEvent([
                 {
                     kinds: [DM],
@@ -93,33 +103,33 @@ export class MakerGatewayService {
                 try {
                     const message = JSON.parse(event.content) as Message<any>;
                     if (message.type === 'reserve_response') {
+                        clearTimeout(timeoutId); // Clear the timeout if we get a response
                         resolve(message.data);
                     }
                 } catch (error) {
+                    clearTimeout(timeoutId); // Clear the timeout if we encounter an error
                     resolve({
                         status: 'error',
                         tradeId,
-                        reservedUtxos: []
+                        reservedUtxos: [],
+                        error: 'Failed to parse response'
                     });
                 }
             })
 
-            await new Promise<void>((res) => {
-                setTimeout(() => {
-                    res();
-                }, 1000);
-            })
-            this.nostrService.publishDirectMessage(JSON.stringify({
-                type: 'reserve_request',
-                data: {
-                    orders: [{
-                        amount: orderAmount.toString(),
-                        orderId: runeOrder.id
-                    }],
-                    tradeId
-                }
-            } as Message<ReserveOrdersRequest>), runeOrder.makerNostrKey.slice(2));
-
+            // Wait a moment to ensure subscription is ready
+            setTimeout(() => {
+                this.nostrService.publishDirectMessage(JSON.stringify({
+                    type: 'reserve_request',
+                    data: {
+                        orders: [{
+                            amount: orderAmount.toString(),
+                            orderId: runeOrder.id
+                        }],
+                        tradeId
+                    }
+                } as Message<ReserveOrdersRequest>), runeOrder.makerNostrKey.slice(2));
+            }, 1000);
         })
     }
 }

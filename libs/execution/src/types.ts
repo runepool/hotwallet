@@ -37,6 +37,7 @@ export class ReserveOrdersResponse {
     status: 'success' | 'error';
     tradeId: string;
     reservedUtxos: string[];
+    error?: string;
 }
 
 export class ReserveOrdersRequest {
