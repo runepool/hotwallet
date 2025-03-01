@@ -70,7 +70,7 @@ export class QuoteService {
           orderToAmount = BigInt(remainingFromAmount) * BigInt(order.price);
           orderFromAmount = remainingFromAmount;
         } else {
-          orderToAmount = BigInt(orderFromAmount) * BigInt(order.price);
+          orderToAmount = BigInt(availableAmount) * BigInt(order.price);
           orderFromAmount = availableAmount;
         }
       }

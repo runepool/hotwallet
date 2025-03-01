@@ -126,7 +126,6 @@ export class EventHandlerService {
         pendingTx.confirmations = 0;
         pendingTx.rune = selectedOrders[0].order.rune;
         pendingTx.status = TransactionStatus.PENDING;
-        pendingTx.reservedUtxos = reservedUtxos.join(",");
         pendingTx.type = selectedOrders[0].type === 'ask' ? TransactionType.BUY : TransactionType.SELL;
         pendingTx.reservedUtxos = reservedUtxos.join(";");
         const result = await this.manager.transaction(async manager => {

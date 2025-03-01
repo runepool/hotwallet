@@ -205,6 +205,7 @@ export class RuneEngineService {
             }
         } = {};
 
+        // Use a cursor here to get the errors
         while (order = orders.shift()) {
             if (!satBalance[order.makerAddress]) {
                 const outputs = await this.blockchainService.getValidFundingInputs(order.makerAddress, order.makerPublicKey);
