@@ -1,85 +1,103 @@
-const { app, BrowserWindow } = require('electron');
-const path = require('path');
-const { fork } = require('child_process');
 const express = require('express');
+const path = require('path');
+const { spawn } = require('child_process');
+const fs = require('fs');
 
-let mainWindow;
 let serverProcess;
 
-app.on('ready', () => {
-  // Check the mode (desktop or server)
-  const mode = process.env.APP_MODE || 'desktop';
-  process.env.BITCOIN_NETWORK = process.env.BITCOIN_NETWORK || 'mainnet';
+// Path to the NestJS server executable
+const getServerPath = () => {
+  return path.join(__dirname, 'dist', 'apps', 'hotwallet', 'main.js');
+};
 
-  // Set up database path in user data directory
-  const userDataPath = app.getPath('userData');
-  const dbPath = path.join(userDataPath, 'exchange.db');
-  process.env.DATABASE_NAME = dbPath;
+// Path to the frontend build directory
+const getFrontendPath = () => {
+  return path.join(__dirname, 'webapp', 'dist');
+};
 
-  // Start the NestJS server with SQLite support
-  const serverPath = path.join(__dirname, 'dist/apps/liquidium-dex/main.js'); // Path to NestJS compiled file
-  const frontendPort = process.env.FRONTEND_PORT || 4000; // Default port for frontend
+// Create and setup the Express server to serve the frontend
+function startFrontEnd() {
+  const frontendServer = express();
+  const frontendPort = process.env.FRONTEND_PORT || 4000;
+  
+  // Serve static files from the frontend build directory
+  frontendServer.use(express.static(getFrontendPath()));
+  
+  // For any other route, serve the index.html (for SPA routing)
+  frontendServer.get('*', (req, res) => {
+    res.sendFile(path.join(getFrontendPath(), 'index.html'));
+  });
+  
+  // Start the frontend server
+  frontendServer.listen(frontendPort, () => {
+    console.log(`Frontend server running on http://localhost:${frontendPort}`);
+  });
+  
+  return frontendPort;
+}
 
-  serverProcess = fork(serverPath, { detached: false })
-
+// Start the NestJS server
+function startServer() {
+  const serverPath = getServerPath();
+  
+  // Check if the server executable exists
+  if (!fs.existsSync(serverPath)) {
+    console.error(`Server executable not found at: ${serverPath}`);
+    process.exit(1);
+  }
+  
+  console.log(`Starting server from: ${serverPath}`);
+  
+  // Spawn the server process
+  serverProcess = spawn('node', [serverPath], {
+    env: {
+      ...process.env,
+      NODE_ENV: process.env.NODE_ENV || 'production'
+    },
+    stdio: 'pipe'
+  });
+  
   // Log server output
-  serverProcess.on('message', (message) => console.log('Server:', message));
-  serverProcess.on('error', (error) => console.error('Server Error:', error));
-  serverProcess.on('exit', (code) => console.log(`Server exited with code: ${code}`));
+  serverProcess.stdout.on('data', (data) => {
+    console.log(`Server: ${data}`);
+  });
+  
+  serverProcess.stderr.on('data', (data) => {
+    console.error(`Server Error: ${data}`);
+  });
+  
+  serverProcess.on('close', (code) => {
+    console.log(`Server process exited with code ${code}`);
+    process.exit(code);
+  });
+  
+  return serverProcess;
+}
 
-  if (mode === 'desktop') {
-    // Create Electron Window in desktop mode
-    mainWindow = new BrowserWindow({
-      width: 1600,
-      height: 800,
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    });
-
-    // Load React app's built frontend
-    const frontendPath = path.join(__dirname, 'webapp/dist/index.html'); // Path to React build output
-    setTimeout(() => {
-      mainWindow.loadFile(frontendPath);
-    }, 3000);
-    mainWindow.on('closed', () => {
-      mainWindow = null;
-    });
-  } else {
-    console.log(`Running in server mode. Frontend will be served on port ${frontendPort}.`);
-
-    // Create a separate Express server to serve the React frontend
-    const frontendServer = express();
-    const reactBuildPath = path.join(__dirname, 'webapp/dist');
-
-    frontendServer.use(express.static(reactBuildPath));
-
-    frontendServer.get('*', (req, res) => {
-      res.sendFile(path.join(reactBuildPath, 'index.html'));
-    });
-
-    frontendServer.listen(frontendPort, () => {
-      console.log(`Frontend is being served on http://localhost:${frontendPort}`);
-    });
+// Handle process termination
+process.on('SIGINT', () => {
+  console.log('Received SIGINT. Graceful shutdown...');
+  if (serverProcess) {
+    serverProcess.kill();
   }
+  process.exit(0);
 });
 
-app.on('window-all-closed', () => {
-  console.log('Window all closed');
-  if (serverProcess) serverProcess.kill('SIGINT'); // Ensure server stops with Electron
-  if (process.platform !== 'darwin') app.quit();
-});
-
-
-app.on('before-quit', () => {
-  console.log('Window all closed');
-  if (serverProcess) serverProcess.kill('SIGINT'); // Ensure server stops with Electron
-});
-
-
-app.on('activate', () => {
-  if (mainWindow === null && process.env.APP_MODE === 'desktop') {
-    app.emit('ready');
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM. Graceful shutdown...');
+  if (serverProcess) {
+    serverProcess.kill();
   }
+  process.exit(0);
 });
+
+// Start the application
+console.log('Starting Runepool DEX server...');
+
+// Start the NestJS server first
+startServer();
+
+// Setup Express server to serve the frontend
+startFrontEnd();
+
+console.log('Runepool DEX server is running');

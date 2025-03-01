@@ -22,9 +22,13 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
+# Liquidium DEX
+
+A decentralized exchange for Rune assets built with NestJS and Electron.
+
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Liquidium DEX is a desktop and server application that allows users to trade Rune assets on the Bitcoin network.
 
 ## Installation
 
@@ -36,16 +40,52 @@ $ yarn install
 
 ```bash
 # development
-$ yarn run start
-
-# watch mode
 $ yarn run start:dev
 
 # production mode
 $ yarn run start:prod
+
+# electron desktop app
+$ yarn run start:electron
 ```
 
-## Test
+## Building the app
+
+The application can be built in two modes:
+- **Desktop mode**: Creates an Electron desktop application
+- **Server mode**: Creates a server distribution package
+
+### Build Commands
+
+```bash
+# Build desktop application for mainnet
+$ yarn run build:desktop
+
+# Build desktop application for testnet
+$ yarn run build:desktop:testnet
+
+# Build server distribution for mainnet
+$ yarn run build:server
+
+# Build server distribution for testnet
+$ yarn run build:server:testnet
+```
+
+### Advanced Build Options
+
+You can also use the build script directly with additional options:
+
+```bash
+$ node build.js --type <desktop|server> --env <development|production> --network <mainnet|testnet> --output <directory>
+```
+
+Options:
+- `--type` or `-t`: Build type (desktop or server), default: desktop
+- `--env` or `-e`: Environment (development or production), default: production
+- `--network` or `-n`: Bitcoin network (mainnet or testnet), default: mainnet
+- `--output` or `-o`: Output directory for the build, default: ./dist-electron
+
+## Testing
 
 ```bash
 # unit tests
@@ -58,16 +98,6 @@ $ yarn run test:e2e
 $ yarn run test:cov
 ```
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
 ## License
 
-Nest is [MIT licensed](LICENSE).
+This project is [MIT licensed](LICENSE).
