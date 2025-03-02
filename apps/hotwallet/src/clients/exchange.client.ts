@@ -10,7 +10,7 @@ import { DatabaseSettingsService } from '@app/database/settings/settings.service
 
 @Injectable()
 export class ExchangeClient implements OnModuleInit {
-  private readonly baseUrl = process.env.EXCHANGE_API_URL || 'http://localhost:3001';
+  private readonly baseUrl = process.env.NODE_ENV === 'production' ? 'https://exchange-api.runepool.org' : 'http://localhost:3001';
   private walletKey: string;
   private nostryKey: string;
 
