@@ -329,7 +329,7 @@ export class RuneEngineService {
                 .dividedBy(decimalDecimals)
                 .toNumber();
 
-            if (availableOrderAmount >= remainingFillAmount) {
+            if (availableOrderAmountInSats >= remainingFillAmount) {
                 // Calculate required rune amount with proper precision
                 const decimalRemainingFill = new Decimal(remainingFillAmount.toString());
                 const runeAmountDecimal = decimalRemainingFill

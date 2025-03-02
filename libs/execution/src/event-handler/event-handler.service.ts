@@ -25,8 +25,8 @@ export class EventHandlerService {
 
     private locks: { [lockId: string]: boolean } = {};
     
-    // Reservation timeout in milliseconds (1 minute)
-    private readonly RESERVATION_TIMEOUT = 1 * 60 * 1000;
+    // Reservation timeout in milliseconds (30 seconds)
+    private readonly RESERVATION_TIMEOUT = 30 * 1000;
 
     constructor(
         @InjectEntityManager() private readonly manager: EntityManager,
@@ -36,7 +36,7 @@ export class EventHandlerService {
         private readonly nostrService: NostrService) {
             
         // Set up periodic cleanup of expired reservations
-        setInterval(() => this.cleanupExpiredReservations(), 60 * 1000); // Run every minute
+        setInterval(() => this.cleanupExpiredReservations(), 30 * 1000); // Run every minute
     }
 
     /**
