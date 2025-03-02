@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ExchangeModule } from './exchange.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import expressBasicAuth from 'express-basic-auth';
+import * as expressBasicAuth from 'express-basic-auth';
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -14,7 +14,7 @@ async function bootstrap() {
   app.enableCors();
   // Sometime after NestFactory add this to add HTTP Basic Auth
   app.use(
-    ['/docs', '/docs-json'],
+    ['/api', '/api-json'],
     expressBasicAuth({
       challenge: true,
       users: {
