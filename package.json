@@ -62,6 +62,7 @@
     "decimal.js": "^10.5.0",
     "dotenv": "^16.4.7",
     "ecpair": "^2.1.0",
+    "express-basic-auth": "^1.2.1",
     "nestjs-axios-retry": "^1.0.7",
     "nostr-tools": "^2.10.4",
     "pg": "^8.13.1",
