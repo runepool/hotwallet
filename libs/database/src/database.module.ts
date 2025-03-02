@@ -21,7 +21,7 @@ import { Transaction } from './entities/transaction.entity';
   imports: [
     TypeOrmModule.forRoot({
       type: 'better-sqlite3' as any,
-      database: process.env.DATABASE_NAME || 'exchange.db',
+      database: process.env.DATABASE_NAME || 'data/exchange.db',
       entities: [RuneOrder,AutoSplitConfiguration, SettingsEntity, Transaction],
       synchronize: true, // Auto-create tables in dev; disable in production
     }),
