@@ -1,6 +1,14 @@
 version: '3.8'
 
 services:
+  cloudflared:
+    image: cloudflare/cloudflared
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=eyJhIjoiNTRhZWI0NWJkMmJiZjczZmIzMjRiZTY2YmQ0NzRkYzciLCJ0IjoiNjk2ZDIzZmQtOWQwYS00NzQ2LTk5YmItYTM3ODNmMDA0Y2M5IiwicyI6Ik9EUm1aalE1WkdFdE1tUTFNUzAwTURnMUxXRTBaVGt0Tmpaa1lqZ3haV00yWmpGaCJ9
+      
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
@@ -36,6 +44,10 @@ services:
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_NAME: ${DB_NAME:-runepool-exchange}
+      ORD_URL: ${ORD_URL-}
+      NOSTR_KEY: ${NOSTR_KEY-}
+      API_MANAGER: ${API_MANAGER}
+      API_PASSWORD: ${API_PASSWORD}
     expose:
       - "3001"
     volumes:
