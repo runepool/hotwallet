@@ -115,7 +115,7 @@ fi
 # Install webapp dependencies
 echo "📦 Installing webapp dependencies"
 cd "$INSTALL_DIR/webapp"
-yarn install
+yarn install --prod
 if [ $? -ne 0 ]; then
   echo "❌ Failed to install webapp dependencies"
   exit 1
