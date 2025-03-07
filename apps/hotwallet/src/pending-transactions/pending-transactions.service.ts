@@ -75,7 +75,8 @@ export class PendingTransactionsService {
                     const config = await this.autoRebalanceConfigService.get(transaction.rune);
                     if (config && config.enabled) {
 
-                        const orders: any = transaction.orders.split(",").map(([_, amount, price]) => {
+                        const orders: any = transaction.orders.split(",").map((order) => {
+                            const [id, amount, price] = order.split(":");
                             const spread = +config.spread;
                             let newPrice: number;
 

@@ -16,8 +16,7 @@ export class RuneOrdersService  {
     private readonly exchangeClient: ExchangeClient,
   ) { }
 
-
-
+  
   async createOrder(orderData: CreateRuneOrderDto): Promise<RuneOrder> {
     const runeInfo = await this.runeService.getRuneInfo(orderData.rune);
 

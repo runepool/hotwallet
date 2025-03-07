@@ -56,18 +56,6 @@ export class EventHandlerService {
         }
     }
 
-    @Cron(CronExpression.EVERY_MINUTE)
-    async clearReservedUtxos() {
-        const RESERVATION_TIMEOUT = 2 * 60 * 1000; // 5 minutes in milliseconds
-        const now = Date.now();
-        
-        for (const [utxo, reservation] of Object.entries(this.reservedUtxos)) {
-            if (now - reservation.timestamp > RESERVATION_TIMEOUT) {
-                delete this.reservedUtxos[utxo];
-            }
-        }
-    }
-
     async handleSignRequest(message: Message<SignRequest>, event: Event) {
         const data = message.data;
         const psbt = Psbt.fromBase64(data.psbtBase64);
@@ -145,7 +133,8 @@ export class EventHandlerService {
             order.filledQuantity += BigInt(orderFill.amount);
             selectedOrders.push({
                 order,
-                usedAmount: BigInt(orderFill.amount)
+                usedAmount: BigInt(orderFill.amount),
+                price: Number(order.price)
             });
         }
 
@@ -161,7 +150,7 @@ export class EventHandlerService {
         const runeAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount, 0n).toString();
         const avgPrice = selectedOrders.reduce((prev, curr) => prev += Number(curr.order.price), 0) / selectedOrders.length;
         const pendingTx = new Transaction();
-        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
+        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.price}`).join(",");
         pendingTx.amount = runeAmount;
         pendingTx.tradeId = fillOrderRequest.tradeId;
         pendingTx.price = avgPrice.toString();
