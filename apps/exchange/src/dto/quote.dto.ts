@@ -1,5 +1,6 @@
 import { IsEnum, IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { SelectedOrder } from '@app/engine/types';
 
 export enum QuoteType {
   BUY = 'buy',
@@ -18,20 +19,6 @@ export class GetQuoteDto {
   @ApiProperty({ description: 'Amount of from token', example: '100000' })
   @IsString()
   amount: string;
-}
-
-export class OrderQuote {
-  @ApiProperty({ description: 'Order ID', example: '123e4567-e89b-12d3-a456-426614174000' })
-  id: string;
-
-  @ApiProperty({ description: 'Amount of from token', example: '50000' })
-  fromAmount: string;
-
-  @ApiProperty({ description: 'Amount of to token', example: '500000' })
-  toAmount: string;
-
-  @ApiProperty({ description: 'Price of to token in from token', example: '10' })
-  price: string;
 }
 
 export class QuoteResponseDto {
@@ -53,8 +40,8 @@ export class QuoteResponseDto {
   @ApiProperty({ description: 'Whether there is enough liquidity for this trade', example: true })
   hasLiquidity: boolean;
 
-  @ApiProperty({ description: 'The orders that would be used for this trade', type: [OrderQuote] })
-  orders: OrderQuote[];
+  @ApiProperty({ description: 'The orders that would be used for this trade' })
+  orders: SelectedOrder[];
 }
 
 

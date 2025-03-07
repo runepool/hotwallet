@@ -35,6 +35,9 @@ export class PendingTransactionsService {
         const transactionsToUpdate = [];
         const transactionsToDelete: string[] = [];
         const currentBlock = await this.bitcoinService.getTipHeight();
+
+        // We create new orders if rebalance strategy is in place
+        const newOrders: RuneOrder[] = [];
         for (const transaction of pendingTransactions) {
             // Give txs time to propagate
             if (transaction.createdAt.getTime() > Date.now() - 30_000) continue;
@@ -65,6 +68,8 @@ export class PendingTransactionsService {
                 transaction.status = TransactionStatus.CONFIRMING;
                 if (transaction.confirmations >= 4) {
                     transaction.status = TransactionStatus.CONFIRMED;
+
+                    const 
                 }
 
                 transactionsToUpdate.push(transaction);

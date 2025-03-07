@@ -29,6 +29,10 @@ interface PreparePsbtResult {
     fee: number;
 }
 
+interface ReserveConfiguration {
+    tradeId: string;
+}
+
 @Injectable()
 export class RuneEngineService {
 
@@ -94,13 +98,11 @@ export class RuneEngineService {
     async handleBuy(req: RuneFillRequest): Promise<FillRuneOrderOffer> {
         // Get rune info
         const runeInfo = await this.runeService.getRuneInfo(req.rune);
-        // Check to see if we have any available orders
-        const orders = await this.orderService.getOrders(runeInfo.spaced_rune_name, OrderStatus.OPEN, RuneOrderType.ASK);
 
         const tradeId = randomUUID();
 
         // Calculate buy params
-        const { runeAmount, selectedOrders } = await this.reserveAskOrders(req, orders, runeInfo, tradeId);
+        const { runeAmount, selectedOrders } = await this.reserveAskOrders(BigInt(req.amount), runeInfo, { tradeId });
 
         // Prepare psbt
         const { swapPsbt, sellerInputsToSign, fee, buyerInputsToSign } = await this.prepareBuyPsbt(req, runeInfo, runeAmount, selectedOrders);
@@ -132,11 +134,9 @@ export class RuneEngineService {
     async handleSell(req: RuneFillRequest): Promise<FillRuneOrderOffer> {
         // Get rune info
         const runeInfo = await this.runeService.getRuneInfo(req.rune);
-        // Check to see if we have any available orders
-        const orders = await this.orderService.getOrders(runeInfo.spaced_rune_name, OrderStatus.OPEN, RuneOrderType.BID);
 
         const tradeId = randomUUID();
-        const { quoteAmount, selectedOrders } = await this.reserveBidOrders(req, orders, runeInfo, tradeId);
+        const { quoteAmount, selectedOrders } = await this.reserveBidOrders(BigInt(req.amount), runeInfo, { tradeId });
         const { swapPsbt, sellerInputsToSign, buyerInputsToSign, fee }: PreparePsbtResult = await this.prepareSellPsbt(req, runeInfo, quoteAmount, selectedOrders);
         const psbt = await this.makerGatewayService.signPsbt(swapPsbt, buyerInputsToSign, selectedOrders.map(item => item.order), tradeId);
 
@@ -191,11 +191,15 @@ export class RuneEngineService {
         return { hasRuneChange, totalRuneAmount, change };
     }
 
-    async reserveBidOrders(req: RuneFillRequest, orders: RuneOrder[], runeInfo: RuneInfo, tradeId: string) {
-        let remainingFillAmount = BigInt(req.amount);
+    async reserveBidOrders(amount: bigint, runeInfo: RuneInfo, reserveConfig?: ReserveConfiguration) {
+        let remainingFillAmount = amount;
         let quoteAmount = 0n;
         let order: RuneOrder;
+
         const selectedOrders: SelectedOrder[] = [];
+
+        // Check to see if we have any available orders
+        const orders = await this.orderService.getOrders(runeInfo.spaced_rune_name, OrderStatus.OPEN, RuneOrderType.BID);
         orders.sort((a, b) => Number(b.price - a.price));
 
         const satBalance: {
@@ -219,12 +223,12 @@ export class RuneEngineService {
             const { balance, outputs } = satBalance[order.makerAddress];
 
             const availableOrderAmount = BigInt(order.quantity - order.filledQuantity);
-            
+
             // Use Decimal.js for precise calculations
             const decimalPrice = new Decimal(order.price.toString());
             const decimalAvailableAmount = new Decimal(availableOrderAmount.toString());
             const decimalDecimals = new Decimal(10).pow(runeInfo.decimals);
-            
+
             // Calculate available amount in sats with proper precision
             const availableOrderAmountInSats = decimalAvailableAmount
                 .times(decimalPrice)
@@ -237,20 +241,24 @@ export class RuneEngineService {
                     .times(decimalPrice)
                     .dividedBy(decimalDecimals)
                     .floor(); // Floor to ensure we don't exceed
-                
+
                 // Skip if quote amount is less than dust
                 if (quoteAmountDecimal.lessThan(546)) {
                     break;
                 }
-                
+
                 const _quoteAmount = BigInt(quoteAmountDecimal.toString());
                 if (balance < _quoteAmount) {
                     continue;
                 }
 
-                const { status, reservedUtxos } = await this.makerGatewayService.reserveOrder(order, remainingFillAmount, tradeId);
-                if (status === 'error') {
-                    continue;
+                let reservedUtxos: string[] = [];
+                if (reserveConfig) {
+                    const { status, reservedUtxos: _reservedUtxos } = await this.makerGatewayService.reserveOrder(order, remainingFillAmount, reserveConfig.tradeId);
+                    if (status === 'error') {
+                        continue;
+                    }
+                    reservedUtxos = _reservedUtxos;
                 }
 
                 order.filledQuantity += remainingFillAmount;
@@ -267,9 +275,13 @@ export class RuneEngineService {
                 continue;
             }
 
-            const { status, reservedUtxos } = await this.makerGatewayService.reserveOrder(order, availableOrderAmount, tradeId);
-            if (status === 'error') {
-                continue;
+            let reservedUtxos: string[] = [];
+            if (reserveConfig) {
+                const { status, reservedUtxos: _reservedUtxos } = await this.makerGatewayService.reserveOrder(order, availableOrderAmount, reserveConfig.tradeId);
+                if (status === 'error') {
+                    continue;
+                }
+                reservedUtxos = _reservedUtxos;
             }
 
             remainingFillAmount -= availableOrderAmount;
@@ -291,11 +303,15 @@ export class RuneEngineService {
         return { quoteAmount, selectedOrders };
     }
 
-    async reserveAskOrders(req: RuneFillRequest, orders: RuneOrder[], runeInfo: RuneInfo, tradeId: string) {
-        let remainingFillAmount = BigInt(req.amount);
+    async reserveAskOrders(amount: bigint, runeInfo: RuneInfo, reserveConfig?: ReserveConfiguration) {
+        let remainingFillAmount = amount;
         let runeAmount = 0n;
         let order: RuneOrder;
         const selectedOrders: SelectedOrder[] = [];
+
+        // Check to see if we have any available orders
+        const orders = await this.orderService.getOrders(runeInfo.spaced_rune_name, OrderStatus.OPEN, RuneOrderType.ASK);
+
         orders.sort((a, b) => Number(a.price - b.price));
 
         const runeBalances: {
@@ -317,12 +333,12 @@ export class RuneEngineService {
             const { balance, outputs } = runeBalances[order.makerAddress];
 
             const availableOrderAmount = order.quantity - order.filledQuantity;
-            
+
             // Use Decimal.js for precise calculations
             const decimalPrice = new Decimal(order.price.toString());
             const decimalAvailableAmount = new Decimal(availableOrderAmount.toString());
             const decimalDecimals = new Decimal(10).pow(runeInfo.decimals);
-            
+
             // Calculate available amount in sats with proper precision
             const availableOrderAmountInSats = decimalAvailableAmount
                 .times(decimalPrice)
@@ -336,16 +352,20 @@ export class RuneEngineService {
                     .dividedBy(decimalPrice)
                     .times(decimalDecimals)
                     .ceil();
-                
+
                 runeAmount = BigInt(runeAmountDecimal.toString());
-                
+
                 if (balance < runeAmount) {
                     continue;
                 }
 
-                const { status, reservedUtxos } = await this.makerGatewayService.reserveOrder(order, runeAmount, tradeId);
-                if (status === 'error') {
-                    continue;
+                let reservedUtxos: string[] = [];
+                if (reserveConfig) {
+                    const { status, reservedUtxos: _reservedUtxos } = await this.makerGatewayService.reserveOrder(order, runeAmount, reserveConfig.tradeId);
+                    if (status === 'error') {
+                        continue;
+                    }
+                    reservedUtxos = reservedUtxos;
                 }
 
                 runeBalances[order.makerAddress].balance -= runeAmount;
@@ -361,26 +381,30 @@ export class RuneEngineService {
                 continue;
             }
 
-            const { status, reservedUtxos } = await this.makerGatewayService.reserveOrder(order, availableOrderAmount, tradeId);
-            if (status === 'error') {
-                continue;
+            let reservedUtxos: string[] = [];
+            if (reserveConfig) {
+                const { status, reservedUtxos: _reservedUtxos } = await this.makerGatewayService.reserveOrder(order, availableOrderAmount, reserveConfig.tradeId);
+                if (status === 'error') {
+                    continue;
+                }
+                reservedUtxos = _reservedUtxos;
             }
 
             // Convert to BigInt after ceiling to ensure we don't underestimate
             const satAmountBigInt = BigInt(Math.ceil(availableOrderAmountInSats));
             remainingFillAmount -= satAmountBigInt;
-            
+
             runeBalances[order.makerAddress].balance -= availableOrderAmount;
             order.filledQuantity += availableOrderAmount;
             order.status = OrderStatus.CLOSED;
             runeAmount += availableOrderAmount;
-            
+
             const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
-            selectedOrders.push({ 
-                order, 
-                usedAmount: availableOrderAmount, 
-                outputs: selectedOutputs, 
-                satAmount: satAmountBigInt 
+            selectedOrders.push({
+                order,
+                usedAmount: availableOrderAmount,
+                outputs: selectedOutputs,
+                satAmount: satAmountBigInt
             });
         }
 

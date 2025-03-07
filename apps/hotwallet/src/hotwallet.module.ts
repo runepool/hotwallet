@@ -11,6 +11,8 @@ import { SettingsController } from './settings/settings.controller';
 import { SettingsModule } from './settings/settings.module';
 import { ClientsModule } from './clients/clients.module';
 import { ExecutionModule } from '@app/execution';
+import { RebalanceController } from './rebalance/rebalance.controller';
+import { RebalanceModule } from './rebalance/rebalance.module';
 
 @Module({
   imports: [
@@ -21,9 +23,10 @@ import { ExecutionModule } from '@app/execution';
     TransactionsDbModule,
     SettingsModule,
     ClientsModule,
-    ExecutionModule
+    ExecutionModule,
+    RebalanceModule
   ],
-  controllers: [RuneOrdersController, AccountController, PendingTransactionController, SettingsController],
+  controllers: [RuneOrdersController, AccountController, PendingTransactionController, SettingsController, RebalanceController],
   providers: [],
 })
 export class HotWalletModule { }
