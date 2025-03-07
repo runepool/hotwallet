@@ -112,7 +112,7 @@ export class RuneEngineService {
         const avgPrice = Number(priceSum) / selectedOrders.length;
 
         const pendingTx = new Trade();
-        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
+        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.order.price}`).join(",");
         pendingTx.amount = runeAmount.toString()
         pendingTx.price = avgPrice.toString();
         pendingTx.confirmations = 0;
@@ -145,7 +145,7 @@ export class RuneEngineService {
         const avgPrice = Number(priceSum) / selectedOrders.length;
 
         const pendingTx = new Trade();
-        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}`).join(",");
+        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.order.price}`).join(",");
         pendingTx.amount = req.amount.toString()
         pendingTx.price = avgPrice.toString();
         pendingTx.confirmations = 0;

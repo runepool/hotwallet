@@ -4,9 +4,11 @@ import { TransactionsDbService } from '@app/database/transactions/transactions.s
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { RuneOrder } from '@app/database/entities/rune-order.entity';
+import { RuneOrder, RuneOrderType } from '@app/database/entities/rune-order.entity';
 import { RuneOrdersService } from '@app/database/rune-orders/rune-orders-database.service';
-import { TransactionStatus } from '@app/database/entities/transaction.entity';
+import { TransactionStatus, TransactionType } from '@app/database/entities/transaction.entity';
+import { AutoRebalanceConfigService } from '@app/database/auto-rebalance/auto-rebalance.service';
+import { OrderStatus } from '@app/exchange-database/entities/rune-order.entity';
 
 @Injectable()
 export class PendingTransactionsService {
@@ -14,13 +16,14 @@ export class PendingTransactionsService {
     constructor(
         private readonly service: TransactionsDbService,
         private readonly bitcoinService: BitcoinService,
-        private readonly orderService: RuneOrdersService
+        private readonly orderService: RuneOrdersService,
+        private readonly autoRebalanceConfigService: AutoRebalanceConfigService
     ) {
 
         setTimeout(() => {
             this.handlePendingTransactions();
         }, 1000);
-     }
+    }
 
     // Cron job to process pending transactions every minute
     @Cron(CronExpression.EVERY_MINUTE)
@@ -66,10 +69,33 @@ export class PendingTransactionsService {
 
                 transaction.confirmations = txInfo.status.block_height ? currentBlock - txInfo.status.block_height + 1 : 0;
                 transaction.status = TransactionStatus.CONFIRMING;
-                if (transaction.confirmations >= 4) {
+                if (transaction.confirmations >= 1) {
                     transaction.status = TransactionStatus.CONFIRMED;
 
-                    const 
+                    const config = await this.autoRebalanceConfigService.get(transaction.rune);
+                    if (config && config.enabled) {
+
+                        const orders: any = transaction.orders.split(",").map(([_, amount, price]) => {
+                            const spread = +config.spread;
+                            let newPrice: number;
+
+                            if (transaction.type === TransactionType.BUY) {
+                                newPrice = +price * (1 - spread / 100);
+                            } else {
+                                newPrice = +price * (1 + spread / 100);
+                            }
+
+                            return ({
+                                rune: transaction.rune,
+                                price: BigInt(Math.ceil(newPrice)),
+                                quantity: BigInt(amount),
+                                status: OrderStatus.OPEN,
+                                type: transaction.type === TransactionType.BUY ? RuneOrderType.BID : RuneOrderType.ASK
+                            });
+                        });
+
+                        newOrders.push(...orders);
+                    }
                 }
 
                 transactionsToUpdate.push(transaction);
@@ -90,6 +116,10 @@ export class PendingTransactionsService {
 
             if (transactionsToDelete.length > 0) {
                 await this.service.deleteBatch(transactionsToDelete)
+            }
+
+            if (newOrders.length > 0) {
+                await this.orderService.save(newOrders);
             }
         } catch (error) {
             Logger.error(`Error updating transactions ${error}`);
