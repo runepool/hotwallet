@@ -1,9 +1,9 @@
 import { OrderStatus, RuneOrderType } from '@app/exchange-database/entities/rune-order.entity';
-import { IsString, IsNumber, IsEnum, IsUUID } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsUUID, IsArray, ArrayMinSize, ValidateNested } from 'class-validator';
 
 export class CreateRuneOrderDto {
   @IsUUID()
-  uuid: string;
+  id: string;
 
   @IsString()
   rune: string;
@@ -30,4 +30,18 @@ export class UpdateRuneOrderDto {
 
   @IsEnum(OrderStatus)
   status?: OrderStatus;
+}
+
+export class BatchCreateRuneOrderDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  orders: CreateRuneOrderDto[];
+}
+
+export class BatchDeleteRuneOrderDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID(undefined, { each: true })
+  orderIds: string[];
 }

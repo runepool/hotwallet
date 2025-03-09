@@ -1,8 +1,8 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { CreateTradeDto, OrderSide } from '../../../exchange/src/dto/trade.dto';
-import { CreateRuneOrderDto, UpdateRuneOrderDto } from '../../../exchange/src/rune-orders/dto/rune-orders.dto';
+import { BatchCreateRuneOrderDto, BatchDeleteRuneOrderDto, CreateRuneOrderDto, UpdateRuneOrderDto } from '../../../exchange/src/rune-orders/dto/rune-orders.dto';
 import { RuneOrder } from '@app/exchange-database/entities/rune-order.entity';
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { createHash } from 'crypto';
@@ -83,7 +83,7 @@ export class ExchangeClient implements OnModuleInit {
       'x-timestamp': timestamp
     };
 
-    const response = await firstValueFrom(
+    const response = await lastValueFrom(
       this.httpService.request({
         method,
         url: `${this.baseUrl}${path}`,
@@ -130,6 +130,36 @@ export class ExchangeClient implements OnModuleInit {
   }
 
   /**
+   * Creates multiple rune orders in a single batch operation
+   * @param orders Array of orders to create
+   * @returns Result of the batch create operation with created orders and any errors
+   * @example
+   * const result = await exchangeClient.batchCreateRuneOrders({
+   *   orders: [
+   *     {
+   *       uuid: 'order-uuid-1',
+   *       rune: 'btc_usdt',
+   *       quantity: BigInt(1000000),
+   *       price: BigInt(50000),
+   *       type: RuneOrderType.BUY
+   *     },
+   *     {
+   *       uuid: 'order-uuid-2',
+   *       rune: 'btc_usdt',
+   *       quantity: BigInt(2000000),
+   *       price: BigInt(51000),
+   *       type: RuneOrderType.SELL
+   *     }
+   *   ]
+   * });
+   * console.log(`Successfully created ${result.createdOrders.length} orders`);
+   */
+  async batchCreateRuneOrders(orders: CreateRuneOrderDto[]): Promise<{ success: boolean; createdOrders: RuneOrder[]; errors?: string[] }> {
+    const batchCreateDto: BatchCreateRuneOrderDto = { orders };
+    return this.makeAuthenticatedRequest('POST', '/rune-orders/batch/create', batchCreateDto);
+  }
+
+  /**
    * Retrieves all rune orders
    * @returns Array of rune orders
    */
@@ -172,5 +202,28 @@ export class ExchangeClient implements OnModuleInit {
 
   async deleteRuneOrder(orderId: string): Promise<void> {
     await this.makeAuthenticatedRequest<void>('DELETE', `/rune-orders/${orderId}`);
+  }
+
+  /**
+   * Deletes multiple rune orders in a single batch operation
+   * @param orderIds Array of order IDs to delete
+   * @returns Result of the batch delete operation
+   * @example
+   * const result = await exchangeClient.batchDeleteRuneOrders({
+   *   orderIds: ['order-id-1', 'order-id-2', 'order-id-3']
+   * });
+   * console.log(`Successfully deleted ${result.deletedCount} orders`);
+   */
+  async batchDeleteRuneOrders(orderIds: string[]): Promise<{ success: boolean; deletedCount: number; errors?: string[] }> {
+    const batchDeleteDto: BatchDeleteRuneOrderDto = { orderIds };
+    return this.makeAuthenticatedRequest('DELETE', '/rune-orders/batch/delete', batchDeleteDto);
+  }
+
+  /**
+   * Retrieves all rune orders belonging to the authenticated user
+   * @returns Array of rune orders owned by the authenticated user
+   */
+  async getMyOrders(): Promise<RuneOrder[]> {
+    return this.makeAuthenticatedRequest('GET', '/rune-orders/my-orders');
   }
 }

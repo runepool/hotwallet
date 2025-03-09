@@ -53,4 +53,17 @@ export class RuneOrdersService {
     async deleteOrder(orderId: string): Promise<void> {
         await this.runeOrderRepository.delete(orderId);
     }
+
+    /**
+     * Deletes multiple orders in a batch operation
+     * @param orderIds Array of order IDs to delete
+     * @returns Promise that resolves when all orders have been deleted
+     */
+    async deleteBatchOrders(orderIds: string[]): Promise<void> {
+        if (!orderIds || orderIds.length === 0) {
+            return;
+        }
+        
+        await this.runeOrderRepository.delete(orderIds);
+    }
 }

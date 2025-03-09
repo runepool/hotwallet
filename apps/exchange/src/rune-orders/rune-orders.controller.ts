@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } fro
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { EcdsaGuard } from '../guards/ecdsa.guard';
 import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
-import { CreateRuneOrderDto, UpdateRuneOrderDto } from './dto/rune-orders.dto';
+import { BatchCreateRuneOrderDto, BatchDeleteRuneOrderDto, CreateRuneOrderDto, UpdateRuneOrderDto } from './dto/rune-orders.dto';
 import { RuneOrdersService } from './rune-orders.service';
 
 @ApiTags('Rune Orders')
@@ -16,25 +16,24 @@ import { RuneOrdersService } from './rune-orders.service';
 export class RuneOrdersController {
   constructor(private readonly ordersService: RuneOrdersService) { }
 
-  @Post()
-  @ApiOperation({ summary: 'Create a new rune order' })
-  @ApiResponse({ status: 201, description: 'The order has been successfully created.' })
+  @Post('batch/create')
+  @ApiOperation({ summary: 'Create multiple rune orders in batch' })
+  @ApiResponse({ status: 201, description: 'The orders have been processed for creation.' })
   @ApiResponse({ status: 401, description: 'Invalid signatures or authentication headers' })
-  create(@Req() req: AuthenticatedRequest, @Body() createOrderDto: CreateRuneOrderDto) {
+  @ApiResponse({ status: 400, description: 'Invalid request body' })
+  batchCreate(@Req() req: AuthenticatedRequest, @Body() batchCreateDto: BatchCreateRuneOrderDto) {
     // Access the verified public keys
     const { nostrPublicKey, corePublicKey, address } = req.user;
 
-    const order = {
-      ...createOrderDto,
-      id: createOrderDto.uuid,
-      makerNostrKey: nostrPublicKey,
-      makerPublicKey: corePublicKey,
-      makerAddress: address
-    }
-
-    // Pass them to the service
-    return this.ordersService.create(order);
+    // Pass the batch data and maker information to the service
+    return this.ordersService.batchCreate(
+      batchCreateDto,
+      nostrPublicKey,
+      corePublicKey,
+      address
+    );
   }
+
 
   @Get()
   @ApiOperation({ summary: 'Get all rune orders' })
@@ -42,6 +41,15 @@ export class RuneOrdersController {
   @ApiResponse({ status: 401, description: 'Invalid signatures or authentication headers' })
   findAll(@Req() req: AuthenticatedRequest) {
     return this.ordersService.findAll();
+  }
+
+  @Get('my-orders')
+  @ApiOperation({ summary: 'Get all rune orders for the authenticated user' })
+  @ApiResponse({ status: 200, description: 'Returns all rune orders for the authenticated user' })
+  @ApiResponse({ status: 401, description: 'Invalid signatures or authentication headers' })
+  getOrders(@Req() req: AuthenticatedRequest) {
+    const { corePublicKey } = req.user;
+    return this.ordersService.findByOwner(corePublicKey);
   }
 
   @Get(':id')
@@ -73,4 +81,40 @@ export class RuneOrdersController {
   remove(@Req() @Param('id') id: string) {
     return this.ordersService.remove(id);
   }
+
+  @Delete('batch/delete')
+  @ApiOperation({ summary: 'Delete multiple rune orders in batch' })
+  @ApiResponse({ status: 200, description: 'The orders have been processed for deletion.' })
+  @ApiResponse({ status: 401, description: 'Invalid signatures or authentication headers' })
+  @ApiResponse({ status: 400, description: 'Invalid request body' })
+  @ApiResponse({ status: 403, description: 'Attempted to delete orders not owned by the user' })
+  batchDelete(@Req() req: AuthenticatedRequest, @Body() batchDeleteDto: BatchDeleteRuneOrderDto) {
+    // Extract the owner's public key from the authenticated request
+    const { corePublicKey } = req.user;
+
+    // Pass the owner's public key to ensure only their orders can be deleted
+    return this.ordersService.batchRemove(batchDeleteDto, corePublicKey);
+  }
+
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new rune order' })
+  @ApiResponse({ status: 201, description: 'The order has been successfully created.' })
+  @ApiResponse({ status: 401, description: 'Invalid signatures or authentication headers' })
+  create(@Req() req: AuthenticatedRequest, @Body() createOrderDto: CreateRuneOrderDto) {
+    // Access the verified public keys
+    const { nostrPublicKey, corePublicKey, address } = req.user;
+
+    const order = {
+      ...createOrderDto,
+      id: createOrderDto.uuid,
+      makerNostrKey: nostrPublicKey,
+      makerPublicKey: corePublicKey,
+      makerAddress: address
+    }
+
+    // Pass them to the service
+    return this.ordersService.create(order);
+  }
+
 }

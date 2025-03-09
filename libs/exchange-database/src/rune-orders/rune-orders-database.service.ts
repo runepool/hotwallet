@@ -19,7 +19,7 @@ export class RuneOrdersService {
         return await this.runeOrderRepository.save(batchData);
     }
 
-    async getOrders(asset?: string, status?: string, type?: RuneOrderType): Promise<RuneOrder[]> {
+    async getOrders(asset?: string, status?: string, type?: RuneOrderType, owner?: string): Promise<RuneOrder[]> {
         const query = this.runeOrderRepository.createQueryBuilder('order');
 
         if (asset) {
@@ -32,6 +32,10 @@ export class RuneOrdersService {
 
         if (type) {
             query.andWhere('order.type = :type', { type });
+        }
+
+        if (owner) {
+            query.andWhere('order.makerPublicKey = :owner', { owner });
         }
 
         query.orderBy({

@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ExchangeModule } from './exchange.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as expressBasicAuth from 'express-basic-auth';
+import { Logger } from '@nestjs/common';
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -32,6 +33,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  await app.listen(process.env.port ?? 3001);
+  await app.listen(process.env.PORT ?? 3001);
+  Logger.log(`App running on port ${process.env.PORT ?? 3001}`);
 }
 bootstrap();
