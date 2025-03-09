@@ -166,7 +166,7 @@ export class RuneEngineService {
         pendingTx.confirmations = 0;
         pendingTx.rune = req.rune;
         pendingTx.status = TransactionStatus.PENDING;
-        pendingTx.type = TransactionType.SELL;
+        pendingTx.type = TransactionType.BUY;
         pendingTx.psbt = psbt.toBase64();
 
         const { id } = await this.transactionsDbService.create(pendingTx);
@@ -199,7 +199,7 @@ export class RuneEngineService {
         pendingTx.confirmations = 0;
         pendingTx.rune = req.rune;
         pendingTx.status = TransactionStatus.PENDING;
-        pendingTx.type = TransactionType.BUY;
+        pendingTx.type = TransactionType.SELL;
         pendingTx.psbt = psbt.toBase64();
 
         const { id } = await this.transactionsDbService.create(pendingTx);
@@ -413,7 +413,7 @@ export class RuneEngineService {
                     if (status === 'error') {
                         continue;
                     }
-                    reservedUtxos = reservedUtxos;
+                    reservedUtxos = _reservedUtxos;
                 }
 
                 runeBalances[order.makerAddress].balance -= runeAmount;
@@ -464,7 +464,6 @@ export class RuneEngineService {
     }
 
     async prepareSellPsbt(req: RuneFillRequest, runeInfo: RuneInfo, quoteAmount: bigint, orders: SelectedOrder[]): Promise<PreparePsbtResult> {
-
         const runeId = new RuneId(+runeInfo.rune_id.split(":")[0], +runeInfo.rune_id.split(":")[1]);
         const runestone = new Runestone([], none(), none(), none());
         const swapPsbt = new Psbt({ network: this.walletService.network });

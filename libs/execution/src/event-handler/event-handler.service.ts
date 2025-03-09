@@ -12,6 +12,7 @@ import { RunesService } from '@app/blockchain/runes/runes.service';
 import { BlockchainService } from '@app/blockchain';
 import { RuneOrder } from '@app/database/entities/rune-order.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Edict, Runestone } from 'runelib';
 
 @Injectable()
 export class EventHandlerService {
@@ -24,7 +25,7 @@ export class EventHandlerService {
     } = {};
 
     private locks: { [lockId: string]: boolean } = {};
-    
+
     // Reservation timeout in milliseconds (30 seconds)
     private readonly RESERVATION_TIMEOUT = 30 * 1000;
 
@@ -34,9 +35,9 @@ export class EventHandlerService {
         private readonly runeService: RunesService,
         private readonly walletService: BitcoinWalletService,
         private readonly nostrService: NostrService) {
-            
+
         // Set up periodic cleanup of expired reservations
-        setInterval(() => this.cleanupExpiredReservations(), 30 * 1000); // Run every minute
+        setInterval(() => this.cleanupExpiredReservations(), 10 * 1000); // Run every minute
     }
 
     /**
@@ -45,20 +46,23 @@ export class EventHandlerService {
     private cleanupExpiredReservations() {
         const now = Date.now();
         const expiredUtxos = Object.entries(this.reservedUtxos)
-            .filter(([_, data]) => now - data.timestamp > this.RESERVATION_TIMEOUT)
+            .filter(([_, data]) => now - data.timestamp >= this.RESERVATION_TIMEOUT)
             .map(([utxo]) => utxo);
-            
+
         if (expiredUtxos.length > 0) {
             console.log(`Cleaning up ${expiredUtxos.length} expired UTXO reservations`);
             expiredUtxos.forEach(utxo => {
                 delete this.reservedUtxos[utxo];
             });
+
+            console.log(this.reservedUtxos);
         }
     }
 
     async handleSignRequest(message: Message<SignRequest>, event: Event) {
         const data = message.data;
         const psbt = Psbt.fromBase64(data.psbtBase64);
+        await this.validatePsbt(psbt, data.tradeId);
         const pubkey = await this.walletService.getPublicKey();
         const signableInputs = data.inputsToSign.filter(input => input.signerAddress === pubkey);
         const signedPsbt = this.walletService.signPsbt(psbt, signableInputs.map(input => input.index));
@@ -80,10 +84,10 @@ export class EventHandlerService {
             if (this.locks && this.locks[lockId]) {
                 throw new Error('Another reservation is in progress with this tradeId');
             }
-            
+
             this.locks = this.locks || {};
             this.locks[lockId] = true;
-            
+
             try {
                 const reservedUtxos = await this.reserveOrders(message.data);
                 await this.nostrService.publishDirectMessage(JSON.stringify(
@@ -103,7 +107,7 @@ export class EventHandlerService {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error during reservation';
             console.error(`Reserve error: ${errorMessage}`, error);
-            
+
             await this.nostrService.publishDirectMessage(JSON.stringify(
                 Object.assign(new Message<ReserveOrdersResponse>(), {
                     type: 'reserve_response',
@@ -146,12 +150,18 @@ export class EventHandlerService {
         } else if (orderType === 'bid') {
             reservedUtxos = await this.reserveBidUTXOs(fillOrderRequest.tradeId, selectedOrders);
         }
-
+        
         const runeAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount, 0n).toString();
+        let satsAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount * BigInt(curr.order.price), 0n);
+        const runeInfo = await this.runeService.getRuneInfo(selectedOrders[0].order.rune);
+
+        satsAmount = satsAmount / BigInt(10 ** runeInfo.decimals);
+
         const avgPrice = selectedOrders.reduce((prev, curr) => prev += Number(curr.order.price), 0) / selectedOrders.length;
         const pendingTx = new Transaction();
         pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.price}`).join(",");
         pendingTx.amount = runeAmount;
+        pendingTx.satsAmount = satsAmount.toString();
         pendingTx.tradeId = fillOrderRequest.tradeId;
         pendingTx.price = avgPrice.toString();
         pendingTx.confirmations = 0;
@@ -217,7 +227,7 @@ export class EventHandlerService {
         }
 
         while (totalAmount > 0n) {
-            const utxo = utxos.pop();
+            const utxo = utxos.shift();
             if (!utxo) {
                 throw new Error('No more UTXOs available');
             }
@@ -234,4 +244,65 @@ export class EventHandlerService {
         return result;
     }
 
+    /**
+     * Validates a PSBT against a specific trade ID
+     * @param psbt The Partially Signed Bitcoin Transaction to validate
+     * @param tradeId The trade ID to validate against
+     * @throws Error if validation fails
+     */
+    async validatePsbt(psbt: Psbt, tradeId: string) {
+        // Find the transaction record for this trade ID
+        const transaction = await this.manager.getRepository(Transaction).findOne({ where: { tradeId } });
+
+        if (!transaction) {
+            throw new Error(`No transaction found for trade ID: ${tradeId}`);
+        }
+
+        if (transaction.status !== TransactionStatus.PENDING) {
+            throw new Error(`Transaction is not in PENDING state: ${transaction.status}`);
+        }
+
+        // Get the reserved UTXOs for this transaction
+        const reservedUtxos = transaction.reservedUtxos.split(';');
+
+        // Extract input outpoints from the PSBT
+        const psbtInputs = psbt.data.inputs.map((_, index) => {
+            const input = psbt.txInputs[index];
+            return `${input.hash.reverse().toString('hex')}:${input.index}`;
+        });
+
+        // Check if all reserved UTXOs are included in the PSBT inputs
+        const usedUtxos = reservedUtxos.filter(utxo => psbtInputs.includes(utxo));
+
+
+        // Additional validation could be added here, such as:
+        // - Verifying output amounts match the expected trade amounts
+        // - Checking that the PSBT doesn't contain unexpected inputs or outputs
+        // - Validating fee rates are reasonable
+
+        const wallet = await this.walletService.getAddress();
+        if (transaction.type == TransactionType.SELL) {
+            const makerOutput = psbt.txOutputs.reverse().find(output => output.address === wallet);
+            if (!makerOutput) {
+                throw new Error('Maker output not found in PSBT');
+            }
+            const makerReceivedSats = makerOutput.value;
+
+            if (+transaction.satsAmount !== makerReceivedSats) {
+                throw new Error('Maker received incorrect amount of sats');
+            }
+        } else {
+            const edictIndex  = psbt.txOutputs.findIndex(output => output.value === 0);
+            const makerOutputIndex = psbt.txOutputs.findIndex((output, index) => index < edictIndex && output.address === wallet);
+            const edicts = Runestone.decipher(psbt.data.getTransaction().toString('hex')).value().edicts;
+            const edict = edicts.find(edict => edict.output === makerOutputIndex);
+
+            if (+transaction.amount !== Number(edict.amount)) {
+                throw new Error('Maker received incorrect amount of rune');
+            }
+        }
+
+        return true; // Validation passed
+    }
 }
+

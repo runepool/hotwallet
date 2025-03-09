@@ -40,6 +40,9 @@ export class Transaction {
   amount: string;
 
   @Column()
+  satsAmount: string;
+
+  @Column()
   price: string;
 
   @Column({ default: 0 })
