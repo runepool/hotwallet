@@ -69,7 +69,7 @@ export class PendingTransactionsService {
 
                 transaction.confirmations = txInfo.status.block_height ? currentBlock - txInfo.status.block_height + 1 : 0;
                 transaction.status = TransactionStatus.CONFIRMING;
-                if (transaction.confirmations >= 1) {
+                if (transaction.confirmations >= 1 && transaction.status !== TransactionStatus.CONFIRMED) {
                     transaction.status = TransactionStatus.CONFIRMED;
 
                     const config = await this.autoRebalanceConfigService.get(transaction.rune);

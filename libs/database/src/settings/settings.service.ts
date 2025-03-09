@@ -15,7 +15,7 @@ export class DatabaseSettingsService {
     if (!settings) {
       // Return default settings if none exist
     return this.settingsRepository.save({
-        ordUrl: 'https://tx.ordstuff.info',
+        ordUrl: 'https://ord.runepool.org',
         nostrRelays: ['wss://relay.runepool.io', 'wss://nostr.zebedee.cloud'],
       });
     }

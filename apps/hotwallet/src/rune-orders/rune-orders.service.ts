@@ -42,9 +42,9 @@ export class RuneOrdersService  {
       });
       this.logger.log(`Order ${localOrder.id} mirrored to exchange successfully`);
     } catch (error) {
+      console.log(error)
       this.logger.error(`Failed to mirror order ${localOrder.id} to exchange: ${error.message}`);
-      // We might want to mark the local order as failed or handle this error differently
-      // depending on your business requirements
+
     }
 
     return localOrder;
@@ -77,8 +77,8 @@ export class RuneOrdersService  {
         });
         this.logger.log(`Order ${localOrder.id} mirrored to exchange successfully`);
       } catch (error) {
+        console.log(error);
         this.logger.error(`Failed to mirror order ${localOrder.id} to exchange: ${error.message}`);
-        // Handle error based on business requirements
       }
     }));
 

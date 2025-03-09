@@ -4,6 +4,7 @@ import { DatabaseSettingsService } from '@app/database/settings/settings.service
 import { BitcoinWalletService } from '@app/wallet';
 import { OrdClient } from '@app/blockchain/common/ord-client/client';
 import { NostrService } from '@app/nostr';
+import { ExchangeClient } from '../clients/exchange.client';
 
 @Injectable()
 export class SettingsService {
@@ -11,6 +12,7 @@ export class SettingsService {
     private readonly walletService: BitcoinWalletService,
     private readonly ordClient: OrdClient,
     private readonly nostrService: NostrService,
+    private readonly exchangeClient: ExchangeClient,
     private readonly dbSettingsService: DatabaseSettingsService) { }
 
   async getSettings(): Promise<UserSettings> {
@@ -47,6 +49,11 @@ export class SettingsService {
     // Update Nostr if private key changes
     if (newSettings.nostrPrivateKey) {
       await this.nostrService.updateKeys();
+    }
+
+     // Update Nostr if private key changes
+     if (newSettings.nostrPrivateKey) {
+      this.exchangeClient.updateKeys(newSettings.nostrPrivateKey, newSettings.bitcoinPrivateKey);
     }
   }
 }

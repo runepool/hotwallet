@@ -3,9 +3,10 @@ import { NostrModule } from '@app/nostr';
 import { WalletModule } from '@app/wallet';
 import { Module } from '@nestjs/common';
 import { SettingsService } from './settings.service';
+import { ClientsModule } from '../clients/clients.module';
 
 @Module({
-  imports: [WalletModule, OrdClientModule, NostrModule],
+  imports: [WalletModule, OrdClientModule, NostrModule, ClientsModule],
   providers: [SettingsService],
   exports: [SettingsService],
 })

@@ -22,10 +22,10 @@ export class ExchangeClient implements OnModuleInit {
   }
   async onModuleInit() {
     const settings = await this.settingsService.getSettings();
-    this.setKeys(settings.nostrPrivateKey, settings.bitcoinPrivateKey);
+    this.updateKeys(settings.nostrPrivateKey, settings.bitcoinPrivateKey);
   }
 
-  setKeys(nostrKey: string, walletKey: string) {
+  public updateKeys(nostrKey: string, walletKey: string) {
     this.nostryKey = nostrKey;
     this.walletKey = walletKey;
   }
