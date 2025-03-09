@@ -200,19 +200,28 @@ export class ExchangeClient implements OnModuleInit {
     return this.makeAuthenticatedRequest('DELETE', `/rune-orders/${id}`);
   }
 
+  /**
+   * Deletes a rune order
+   * @param orderId The order ID to delete
+   */
   async deleteRuneOrder(orderId: string): Promise<void> {
     await this.makeAuthenticatedRequest<void>('DELETE', `/rune-orders/${orderId}`);
   }
 
   /**
-   * Deletes multiple rune orders in a single batch operation
+   * Deletes multiple rune orders in a batch operation
    * @param orderIds Array of order IDs to delete
-   * @returns Result of the batch delete operation
+   * @returns Result of the batch delete operation with count of deleted orders and any errors
    * @example
-   * const result = await exchangeClient.batchDeleteRuneOrders({
-   *   orderIds: ['order-id-1', 'order-id-2', 'order-id-3']
-   * });
+   * const result = await exchangeClient.batchDeleteRuneOrders([
+   *   'order-id-1',
+   *   'order-id-2',
+   *   'order-id-3'
+   * ]);
    * console.log(`Successfully deleted ${result.deletedCount} orders`);
+   * if (result.errors) {
+   *   console.warn(`Errors: ${result.errors.join(', ')}`);
+   * }
    */
   async batchDeleteRuneOrders(orderIds: string[]): Promise<{ success: boolean; deletedCount: number; errors?: string[] }> {
     const batchDeleteDto: BatchDeleteRuneOrderDto = { orderIds };

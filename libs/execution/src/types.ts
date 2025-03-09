@@ -29,7 +29,7 @@ export class SwapResult {
 }
 
 export class Message<T> {
-    type: 'reserve_request' | 'reserve_response' | 'sign_request' | 'sign_response' | 'result'
+    type: 'reserve_request' | 'reserve_response' | 'sign_request' | 'sign_response' | 'result' | 'ping' | 'pong'
     data: T
 }
 
@@ -62,6 +62,9 @@ export class SignResponse {
     signedPsbtBase64: string;
 }
 
+export class Pong {
+    timestamp: number;
+}
 
 export class RuneFillRequest {
     takerPaymentAddress: string;

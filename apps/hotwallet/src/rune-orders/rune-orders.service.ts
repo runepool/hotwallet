@@ -41,7 +41,7 @@ export class RuneOrdersService {
     try {
       // Mirror order to exchange
       await this.exchangeClient.createRuneOrder({
-        uuid: localOrder.id,
+        id: localOrder.id,
         rune: localOrder.rune,
         quantity: localOrder.quantity,
         price: localOrder.price,
@@ -74,7 +74,7 @@ export class RuneOrdersService {
 
     // Prepare orders for exchange batch creation
     const exchangeOrders = localOrders.map(localOrder => ({
-      uuid: localOrder.id,
+      id: localOrder.id,
       rune: localOrder.rune,
       quantity: localOrder.quantity,
       price: localOrder.price,
@@ -122,6 +122,11 @@ export class RuneOrdersService {
     }
   }
 
+  /**
+   * Deletes multiple orders in a batch operation
+   * @param batchData Object containing array of orders to delete
+   * @returns Promise that resolves when the operation is complete
+   */
   async deleteBatchOrders(batchData: { orders: RuneOrder[] }): Promise<void> {
     if (!batchData.orders || batchData.orders.length === 0) {
       return;
@@ -132,8 +137,8 @@ export class RuneOrdersService {
 
     try {
       // Delete orders locally first
-      await this.dbService.deleteBatchOrders(orderIds);
-      this.logger.log('Successfully deleted orders from local database');
+      const deletedCount = await this.dbService.deleteBatchOrders(orderIds);
+      this.logger.log(`Successfully deleted ${deletedCount} orders from local database`);
 
       // Then use the batch delete endpoint to delete from exchange
       const result = await this.exchangeClient.batchDeleteRuneOrders(orderIds);

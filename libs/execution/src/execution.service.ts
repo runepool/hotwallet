@@ -2,7 +2,7 @@ import { NostrService } from '@app/nostr';
 import { DM } from '@app/nostr/constants';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Event } from 'nostr-tools';
-import { Message } from './types';
+import { Message, Pong } from './types';
 
 import { PendingTransactionsService } from 'apps/hotwallet/src/pending-transactions/pending-transactions.service';
 import { EventHandlerService } from './event-handler/event-handler.service';
@@ -37,6 +37,16 @@ export class ExecutionService implements OnModuleInit {
 
                 if (message.type === 'sign_request') {
                     await this.eventHandlerService.handleSignRequest(message, event);
+                }
+
+                if (message.type === 'ping') {
+                    await this.nostrService.publishDirectMessage(JSON.stringify(
+                        Object.assign(new Message<Pong>(), {
+                            type: 'pong',
+                            data: {
+                                timestamp: Date.now()
+                            }
+                        })), event.pubkey);
                 }
             } catch (error) {
                 console.error("Error", error);

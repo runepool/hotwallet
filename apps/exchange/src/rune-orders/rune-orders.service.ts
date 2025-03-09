@@ -51,8 +51,8 @@ export class RuneOrdersService {
         createdOrders.push(createdOrder);
         this.logger.log(`Successfully created order ${createdOrder.id} for maker ${makerPublicKey}`);
       } catch (error) {
-        this.logger.error(`Failed to create order with UUID ${orderDto.uuid}: ${error.message}`);
-        errors.push(`Failed to create order with UUID ${orderDto.uuid}: ${error.message}`);
+        this.logger.error(`Failed to create order with UUID ${orderDto.id}: ${error.message}`);
+        errors.push(`Failed to create order with UUID ${orderDto.id}: ${error.message}`);
       }
     }
     
@@ -87,35 +87,57 @@ export class RuneOrdersService {
     await this.runeOrdersDatabaseService.deleteOrder(id);
   }
 
+  /**
+   * Deletes multiple orders in a batch operation
+   * @param batchDeleteDto DTO containing array of order IDs to delete
+   * @param ownerPublicKey Public key of the authenticated user
+   * @returns Result of the batch delete operation with count of deleted orders and any errors
+   */
   async batchRemove(batchDeleteDto: BatchDeleteRuneOrderDto, ownerPublicKey: string): Promise<{ success: boolean; deletedCount: number; errors?: string[] }> {
     this.logger.log(`Attempting to delete ${batchDeleteDto.orderIds.length} orders in batch for owner ${ownerPublicKey}`);
     
+    if (!batchDeleteDto.orderIds || batchDeleteDto.orderIds.length === 0) {
+      return { success: true, deletedCount: 0 };
+    }
+
     const errors = [];
     let deletedCount = 0;
+    const validOrderIds = [];
     
-    // Process each order deletion with ownership check
-    for (const orderId of batchDeleteDto.orderIds) {
-      try {
-        // First, verify the order exists and belongs to the owner
-        const order = await this.runeOrdersDatabaseService.getOrderById(orderId);
+    // First verify ownership of all orders in a single batch operation
+    try {
+      // Get all orders in one database call
+      const ordersToCheck = await Promise.all(
+        batchDeleteDto.orderIds.map(id => this.runeOrdersDatabaseService.getOrderById(id))
+      );
+      
+      // Verify each order exists and belongs to the owner
+      for (let i = 0; i < ordersToCheck.length; i++) {
+        const order = ordersToCheck[i];
+        const orderId = batchDeleteDto.orderIds[i];
         
         if (!order) {
-          throw new NotFoundException(`Order ${orderId} not found`);
+          errors.push(`Order ${orderId} not found`);
+          continue;
         }
         
-        // Check if the order belongs to the authenticated user
         if (order.makerPublicKey !== ownerPublicKey) {
-          throw new ForbiddenException(`Order ${orderId} does not belong to the authenticated user`);
+          errors.push(`Order ${orderId} does not belong to the authenticated user`);
+          continue;
         }
         
-        // If ownership is verified, proceed with deletion
-        await this.runeOrdersDatabaseService.deleteOrder(orderId);
-        deletedCount++;
-        this.logger.log(`Successfully deleted order ${orderId} owned by ${ownerPublicKey}`);
-      } catch (error) {
-        this.logger.error(`Failed to delete order ${orderId}: ${error.message}`);
-        errors.push(`Failed to delete order ${orderId}: ${error.message}`);
+        // If ownership is verified, add to valid IDs for batch deletion
+        validOrderIds.push(orderId);
       }
+      
+      // If we have valid orders to delete, use batch delete
+      if (validOrderIds.length > 0) {
+        deletedCount = await this.runeOrdersDatabaseService.batchDeleteOrders(validOrderIds);
+        this.logger.log(`Successfully deleted ${deletedCount} orders owned by ${ownerPublicKey}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error in batch delete operation: ${error.message}`);
+      errors.push(`Batch delete operation failed: ${error.message}`);
     }
     
     return {

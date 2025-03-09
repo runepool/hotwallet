@@ -107,7 +107,7 @@ export class RuneOrdersController {
 
     const order = {
       ...createOrderDto,
-      id: createOrderDto.uuid,
+      id: createOrderDto.id,
       makerNostrKey: nostrPublicKey,
       makerPublicKey: corePublicKey,
       makerAddress: address

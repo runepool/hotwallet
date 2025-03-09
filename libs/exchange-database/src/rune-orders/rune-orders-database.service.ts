@@ -19,6 +19,53 @@ export class RuneOrdersService {
         return await this.runeOrderRepository.save(batchData);
     }
 
+    /**
+     * Gets all unique makers with their information from the orders table
+     * @returns Array of unique makers with their nostr key, public key, and address
+     */
+    async getAllMakers(): Promise<{ makerNostrKey: string; makerPublicKey: string; makerAddress: string }[]> {
+        // Get distinct makers with their information
+        const makers = await this.runeOrderRepository
+            .createQueryBuilder('order')
+            .select([
+                'order.makerNostrKey',
+                'order.makerPublicKey',
+                'order.makerAddress'
+            ])
+            .distinctOn(['order.makerPublicKey'])
+            .getRawMany();
+
+        return makers.map(maker => ({
+            makerNostrKey: maker.order_makerNostrKey,
+            makerPublicKey: maker.order_makerPublicKey,
+            makerAddress: maker.order_makerAddress
+        }));
+    }
+
+    /**
+     * Gets all active makers with at least one open order
+     * @returns Array of active makers with their information
+     */
+    async getActiveMakers(): Promise<{ makerNostrKey: string; makerPublicKey: string; makerAddress: string }[]> {
+        // Get distinct makers with at least one open order
+        const makers = await this.runeOrderRepository
+            .createQueryBuilder('order')
+            .select([
+                'order.makerNostrKey',
+                'order.makerPublicKey',
+                'order.makerAddress'
+            ])
+            .where('order.status = :status', { status: 'open' })
+            .distinctOn(['order.makerPublicKey'])
+            .getRawMany();
+
+        return makers.map(maker => ({
+            makerNostrKey: maker.order_makerNostrKey,
+            makerPublicKey: maker.order_makerPublicKey,
+            makerAddress: maker.order_makerAddress
+        }));
+    }
+
     async getOrders(asset?: string, status?: string, type?: RuneOrderType, owner?: string): Promise<RuneOrder[]> {
         const query = this.runeOrderRepository.createQueryBuilder('order');
 
@@ -56,5 +103,33 @@ export class RuneOrdersService {
 
     async deleteOrder(orderId: string): Promise<void> {
         await this.runeOrderRepository.delete(orderId);
+    }
+
+    /**
+     * Deletes multiple rune orders by their IDs
+     * @param orderIds Array of order IDs to delete
+     * @returns Promise resolving to the number of orders deleted
+     */
+    async batchDeleteOrders(orderIds: string[]): Promise<number> {
+        if (!orderIds || orderIds.length === 0) {
+            return 0;
+        }
+
+        const result = await this.runeOrderRepository.delete(orderIds);
+        return result.affected || 0;
+    }
+
+    /**
+     * Deletes all orders for a specific maker
+     * @param makerPublicKey The public key of the maker whose orders should be deleted
+     * @returns Promise resolving to the number of orders deleted
+     */
+    async deleteOrdersByMaker(makerPublicKey: string): Promise<number> {
+        if (!makerPublicKey) {
+            return 0;
+        }
+
+        const result = await this.runeOrderRepository.delete({ makerPublicKey });
+        return result.affected || 0;
     }
 }

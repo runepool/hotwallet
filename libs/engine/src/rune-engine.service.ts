@@ -21,6 +21,7 @@ import { Edict, none, RuneId, Runestone } from 'runelib';
 import { MakerGatewayService } from './maker-gateway/maker-gateway.service';
 import { FillRuneOrderOffer, RuneFillRequest, SelectedOrder, SwapResult } from './types';
 import { calculateTransactionSize } from '@app/blockchain/bitcoin/utils';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 interface PreparePsbtResult {
     swapPsbt: Psbt;
@@ -36,6 +37,8 @@ interface ReserveConfiguration {
 @Injectable()
 export class RuneEngineService {
 
+    checkingMarketMakers = false;
+
     constructor(
         private readonly orderService: RuneOrdersService,
         private readonly bitcoinService: BitcoinService,
@@ -45,6 +48,51 @@ export class RuneEngineService {
         private readonly blockchainService: BlockchainService,
         private readonly makerGatewayService: MakerGatewayService
     ) { }
+
+    /**
+     * Periodically checks the health of market makers by sending ping messages
+     * This helps identify which market makers are online and responsive
+     */
+    @Cron(CronExpression.EVERY_10_SECONDS)
+    async checkMarketMakers() {
+        try {
+            if (this.checkingMarketMakers) {
+                return;
+            }
+
+            this.checkingMarketMakers = true;
+            // Get all active makers with open orders
+            const activeMakers = await this.orderService.getActiveMakers();
+
+            if (activeMakers.length === 0) {
+                return;
+            }
+
+            Logger.log(`Checking health of ${activeMakers.length} active market makers`);
+
+            // Send ping message to each active maker
+            for (const maker of activeMakers) {
+                try {
+                    await this.makerGatewayService.pingMaker(maker.makerNostrKey);
+                } catch (error) {
+                    Logger.warn(`Failed to ping market maker ${maker.makerNostrKey}: ${error.message}`);
+                    // Remove the maker's orders since they are unresponsive
+                    try {
+                        const deletedCount = await this.orderService.deleteOrdersByMaker(maker.makerPublicKey);
+                        if (deletedCount > 0) {
+                            Logger.log(`Removed ${deletedCount} orders from unresponsive market maker ${maker.makerNostrKey}`);
+                        }
+                    } catch (deleteError) {
+                        Logger.error(`Failed to delete orders from unresponsive maker ${maker.makerNostrKey}: ${deleteError.message}`);
+                    }
+                }
+            }
+        } catch (error) {
+            Logger.error(`Error checking market makers: ${error.message}`);
+        } finally {
+            this.checkingMarketMakers = false;
+        }
+    }
 
 
     async finalize(swap: ExecuteTradeDto): Promise<SwapResult> {
