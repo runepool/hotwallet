@@ -157,6 +157,10 @@ export const Errors = {
   INSUFFICIENT_FUNDS: {
     code: 1037,
     message: `Insufficient funds`
+  },
+  TX_VALUE_TO_SMALL: {
+    code: 1038,
+    message: `Transaction value is too small to cover for network fee`
   }
 };
 

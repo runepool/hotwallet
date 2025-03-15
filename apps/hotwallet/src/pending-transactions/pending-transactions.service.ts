@@ -61,6 +61,10 @@ export class PendingTransactionsService {
                             ordersToUpdate.push(order);
                         } else {
                             ordersToUpdate[orderIndex].filledQuantity -= BigInt(amount);
+                            // Ensure it doesn't go below zero
+                            if (ordersToUpdate[orderIndex].filledQuantity < BigInt(0)) {
+                                ordersToUpdate[orderIndex].filledQuantity = BigInt(0);
+                            }
                         }
                     }
                     transactionsToDelete.push(transaction.id);
@@ -91,7 +95,7 @@ export class PendingTransactionsService {
                                 price: BigInt(Math.ceil(newPrice)),
                                 quantity: BigInt(amount),
                                 status: OrderStatus.OPEN,
-                                type: transaction.type === TransactionType.BUY ? RuneOrderType.BID : RuneOrderType.ASK
+                                type: transaction.type === TransactionType.SELL ? RuneOrderType.BID : RuneOrderType.ASK
                             });
                         });
 

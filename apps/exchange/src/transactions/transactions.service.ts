@@ -3,6 +3,7 @@ import { TransactionsDbService } from '@app/exchange-database/transactions/trans
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { BitcoinService } from '@app/blockchain/bitcoin/bitcoin.service';
+import { RuneOrdersService } from '@app/exchange-database/rune-orders/rune-orders-database.service';
 
 @Injectable()
 export class TransactionsService {
@@ -11,7 +12,12 @@ export class TransactionsService {
     constructor(
         private readonly transactionsDbService: TransactionsDbService,
         private readonly bitcoinService: BitcoinService,
-    ) { }
+        private readonly runeOrdersService: RuneOrdersService,
+    ) {
+        setTimeout(() => {
+            this.checkPendingTransactions()
+        }, 2000);
+    }
 
     async create(createTransactionDto: Partial<Transaction>): Promise<Transaction> {
         return this.transactionsDbService.create(createTransactionDto);
@@ -42,23 +48,41 @@ export class TransactionsService {
         try {
             this.logger.debug('Checking pending transactions...');
             const pendingTransactions = await this.transactionsDbService.findPendingAndConfirming();
-            
+
             if (pendingTransactions.length === 0) {
                 return;
             }
-            
+
             this.logger.debug(`Found ${pendingTransactions.length} pending/confirming transactions to check`);
-            
+
             const tipHeight = await this.bitcoinService.getTipHeight();
             const updatedTransactions: Partial<Transaction>[] = [];
-            
+
             for (const transaction of pendingTransactions) {
-                // Skip transactions without txid (not yet broadcast)
-                if (!transaction.txid) {
-                    continue;
-                }
-                
                 try {
+                    // Check transactions without txid - mark as errored if they've been pending for too long
+                    if (!transaction.txid) {
+                        // Calculate age in seconds
+                        const ageInSeconds = (Date.now() - new Date(transaction.createdAt).getTime()) / 1000;
+
+                        // If transaction has been pending for more than 30 seconds without a txid, mark as errored
+                        if (ageInSeconds > 30) {
+                            this.logger.warn(`Transaction ${transaction.id} has no txid after ${Math.floor(ageInSeconds)} seconds, marking as errored`);
+
+                            // Mark transaction as errored
+                            updatedTransactions.push({
+                                id: transaction.id,
+                                status: TransactionStatus.ERRORED
+                            });
+
+
+                            continue;
+                        }
+
+                        // Skip further checks for transactions without txid
+                        continue;
+                    }
+
                     // First try to fetch the transaction directly - if this fails, it's not in mempool or blockchain
                     try {
                         await this.bitcoinService.getTx(transaction.txid);
@@ -66,31 +90,38 @@ export class TransactionsService {
                         // Transaction not found in mempool or blockchain
                         if (transaction.status === TransactionStatus.PENDING) {
                             this.logger.warn(`Transaction ${transaction.id} (${transaction.txid}) not found in mempool, marking as errored`);
+
+                            // Mark transaction as errored
                             updatedTransactions.push({
                                 id: transaction.id,
                                 status: TransactionStatus.ERRORED
                             });
+
                             continue;
                         }
                     }
-                    
+
                     // If we get here, the transaction exists, so check its status
                     const txStatus = await this.bitcoinService.getTxStatus(transaction.txid);
-                    
+
                     // Transaction not found or errored
                     if (!txStatus) {
                         // If transaction has been pending for too long, mark as errored
                         const ageInHours = (Date.now() - new Date(transaction.createdAt).getTime()) / (1000 * 60 * 60);
                         if (ageInHours > 24) {
                             this.logger.warn(`Transaction ${transaction.id} (${transaction.txid}) has been pending for over 24 hours, marking as errored`);
+
+                            // Mark transaction as errored
                             updatedTransactions.push({
                                 id: transaction.id,
                                 status: TransactionStatus.ERRORED
                             });
+
+                            continue;
                         }
                         continue;
                     }
-                    
+
                     // Transaction found in mempool but not confirmed yet
                     if (!txStatus.confirmed) {
                         if (transaction.status !== TransactionStatus.CONFIRMING) {
@@ -103,16 +134,16 @@ export class TransactionsService {
                         }
                         continue;
                     }
-                    
+
                     // Transaction is confirmed, calculate confirmations
                     const confirmations = tipHeight - txStatus.block_height + 1;
-                    
+
                     // Update transaction with confirmation count
                     if (transaction.confirmations !== confirmations) {
                         const newStatus = confirmations >= 3 ? TransactionStatus.CONFIRMED : TransactionStatus.CONFIRMING;
-                        
+
                         this.logger.log(`Transaction ${transaction.id} (${transaction.txid}) has ${confirmations} confirmations, updating status to ${newStatus}`);
-                        
+
                         updatedTransactions.push({
                             id: transaction.id,
                             status: newStatus,
@@ -120,10 +151,10 @@ export class TransactionsService {
                         });
                     }
                 } catch (error) {
-                    this.logger.error(`Error checking transaction ${transaction.id} (${transaction.txid}): ${error.message}`);
+                    this.logger.error(`Error checking transaction ${transaction.id} (${transaction.txid || 'no txid'}): ${error.message}`);
                 }
             }
-            
+
             // Save all updated transactions in a batch
             if (updatedTransactions.length > 0) {
                 await this.transactionsDbService.save(updatedTransactions);

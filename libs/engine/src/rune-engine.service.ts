@@ -1,7 +1,8 @@
 import { BlockchainService } from '@app/blockchain';
 import { BitcoinService } from '@app/blockchain/bitcoin/bitcoin.service';
 import { SignableInput, UnspentOutput } from '@app/blockchain/bitcoin/types/UnspentOutput';
-import { appendUnspentOutputsAsNetworkFee, sumInputsValues, takeNetowrkFeeFromOutput } from '@app/blockchain/psbtUtils';
+import { calculateTransactionSize } from '@app/blockchain/bitcoin/utils';
+import { appendUnspentOutputsAsNetworkFee, sumInputsValues } from '@app/blockchain/psbtUtils';
 import { RunesService } from '@app/blockchain/runes/runes.service';
 import { RuneInfo } from '@app/blockchain/runes/types';
 import { TransactionType } from '@app/database/entities/transaction.entity';
@@ -12,17 +13,15 @@ import { TransactionsDbService } from '@app/exchange-database/transactions/trans
 import { MAKER_BONUS, PROTOCOL_FEE, PROTOCOL_FEE_OUTPUT } from '@app/nostr/constants';
 import { BitcoinWalletService } from '@app/wallet';
 import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ExecuteTradeDto } from 'apps/exchange/src/dto/trade.dto';
-import { Psbt, Transaction } from 'bitcoinjs-lib';
+import { Psbt } from 'bitcoinjs-lib';
 import { randomUUID } from 'crypto';
 import Decimal from 'decimal.js';
 import { Errors, OracleError } from 'libs/errors/errors';
 import { Edict, none, RuneId, Runestone } from 'runelib';
 import { MakerGatewayService } from './maker-gateway/maker-gateway.service';
 import { FillRuneOrderOffer, RuneFillRequest, SelectedOrder, SwapResult } from './types';
-import { calculateTransactionSize } from '@app/blockchain/bitcoin/utils';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { error } from 'console';
 
 interface PreparePsbtResult {
     swapPsbt: Psbt;
@@ -575,7 +574,11 @@ export class RuneEngineService {
         const totalFee = new Decimal(totalMakerFee).plus(protocolFee).toFixed();
         const netAmount = new Decimal(quoteAmount.toString()).minus(totalFee).plus(runeSatsChange.toString()).sub(fee).toFixed(0);
 
-        // The seller nbtc 
+        if (+netAmount < 0) {
+            throw new OracleError(Errors.TX_VALUE_TO_SMALL);
+        }
+
+        // The seller btc 
         swapPsbt.addOutput({
             address: req.takerPaymentAddress,
             value: Number(netAmount)

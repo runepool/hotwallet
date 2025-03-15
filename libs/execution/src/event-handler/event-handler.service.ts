@@ -135,6 +135,7 @@ export class EventHandlerService {
                 throw new Error(`Order ${orderFill.orderId} quantity exceeded`);
             }
             order.filledQuantity += BigInt(orderFill.amount);
+            Logger.debug(`Order ${orderFill.orderId} filled quantity: ${order.filledQuantity}`);
             selectedOrders.push({
                 order,
                 usedAmount: BigInt(orderFill.amount),
@@ -282,7 +283,7 @@ export class EventHandlerService {
         // - Validating fee rates are reasonable
 
         const wallet = await this.walletService.getAddress();
-        if (transaction.type == TransactionType.SELL) {
+        if (transaction.type == TransactionType.BUY) {
             const makerOutput = psbt.txOutputs.reverse().find(output => output.address === wallet);
             if (!makerOutput) {
                 throw new Error('Maker output not found in PSBT');

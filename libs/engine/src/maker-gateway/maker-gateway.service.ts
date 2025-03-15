@@ -145,7 +145,7 @@ export class MakerGatewayService {
                     reservedUtxos: [],
                     error: 'Request timed out'
                 });
-            }, 15000); // 15 seconds timeout
+            }, 20000); // 15 seconds timeout
 
             this.nostrService.subscribeToOneEvent([
                 {
@@ -172,8 +172,8 @@ export class MakerGatewayService {
             })
 
             // Wait a moment to ensure subscription is ready
-            setTimeout(() => {
-                this.nostrService.publishDirectMessage(JSON.stringify({
+            setTimeout(async () => {
+                await this.nostrService.publishDirectMessage(JSON.stringify({
                     type: 'reserve_request',
                     data: {
                         orders: [{
