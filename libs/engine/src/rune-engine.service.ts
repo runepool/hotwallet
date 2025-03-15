@@ -22,6 +22,7 @@ import { MakerGatewayService } from './maker-gateway/maker-gateway.service';
 import { FillRuneOrderOffer, RuneFillRequest, SelectedOrder, SwapResult } from './types';
 import { calculateTransactionSize } from '@app/blockchain/bitcoin/utils';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { error } from 'console';
 
 interface PreparePsbtResult {
     swapPsbt: Psbt;
@@ -38,6 +39,7 @@ interface ReserveConfiguration {
 export class RuneEngineService {
 
     checkingMarketMakers = false;
+    pings: { [address: string]: number } = {}
 
     constructor(
         private readonly orderService: RuneOrdersService,
@@ -48,6 +50,10 @@ export class RuneEngineService {
         private readonly blockchainService: BlockchainService,
         private readonly makerGatewayService: MakerGatewayService
     ) { }
+
+    public ping(address: string) {
+        this.pings[address] = Date.now();
+    }
 
     /**
      * Periodically checks the health of market makers by sending ping messages
@@ -69,23 +75,23 @@ export class RuneEngineService {
             }
 
             Logger.log(`Checking health of ${activeMakers.length} active market makers`);
-
             // Send ping message to each active maker
             for (const maker of activeMakers) {
-                try {
-                    await this.makerGatewayService.pingMaker(maker.makerNostrKey);
-                } catch (error) {
-                    Logger.warn(`Failed to ping market maker ${maker.makerNostrKey}: ${error.message}`);
-                    // Remove the maker's orders since they are unresponsive
-                    try {
-                        const deletedCount = await this.orderService.deleteOrdersByMaker(maker.makerPublicKey);
-                        if (deletedCount > 0) {
-                            Logger.log(`Removed ${deletedCount} orders from unresponsive market maker ${maker.makerNostrKey}`);
-                        }
-                    } catch (deleteError) {
-                        Logger.error(`Failed to delete orders from unresponsive maker ${maker.makerNostrKey}: ${deleteError.message}`);
-                    }
+                const now = Date.now();
+                if(this.pings[maker.makerAddress] && now - this.pings[maker.makerAddress] < 15000 ) {
+                    continue;
                 }
+
+                // Remove the maker's orders since they are unresponsive
+                try {
+                    const deletedCount = await this.orderService.deleteOrdersByMaker(maker.makerPublicKey);
+                    if (deletedCount > 0) {
+                        Logger.log(`Removed ${deletedCount} orders from unresponsive market maker ${maker.makerNostrKey}`);
+                    }
+                } catch (deleteError) {
+                    Logger.error(`Failed to delete orders from unresponsive maker ${maker.makerNostrKey}: ${deleteError.message}`);
+                }
+
             }
         } catch (error) {
             Logger.error(`Error checking market makers: ${error.message}`);
@@ -307,9 +313,9 @@ export class RuneEngineService {
                         continue;
                     }
                     reservedUtxos = _reservedUtxos;
+                    order.filledQuantity += remainingFillAmount;
                 }
 
-                order.filledQuantity += remainingFillAmount;
                 const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
                 selectedOrders.push({ order, usedAmount: remainingFillAmount, satAmount: _quoteAmount, outputs: selectedOutputs });
                 quoteAmount += _quoteAmount;
@@ -414,10 +420,10 @@ export class RuneEngineService {
                         continue;
                     }
                     reservedUtxos = _reservedUtxos;
+                    order.filledQuantity += runeAmount;
                 }
 
                 runeBalances[order.makerAddress].balance -= runeAmount;
-                order.filledQuantity += runeAmount;
                 const selectedOutputs = outputs.filter(item => reservedUtxos.includes(item.location));
 
                 selectedOrders.push({ order, usedAmount: runeAmount, outputs: selectedOutputs, satAmount: remainingFillAmount });

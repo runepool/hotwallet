@@ -1,5 +1,5 @@
 import { DatabaseSettingsService } from '@app/database/settings/settings.service';
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as secp from "@noble/curves/secp256k1";
 import { createCipheriv, createDecipheriv, randomFillSync } from 'crypto';
 import { Event, finalizeEvent, getPublicKey, SimplePool } from 'nostr-tools';
@@ -25,7 +25,7 @@ export class NostrService implements OnModuleInit {
             this.privateKey = Uint8Array.from(Buffer.from(process.env.NOSTR_KEY, 'hex'));
             this.publicKey = getPublicKey(this.privateKey);
             return;
-          }
+        }
         await this.updateKeys();
     }
 
@@ -56,8 +56,8 @@ export class NostrService implements OnModuleInit {
     }
 
     async subscribeToEvent(filters: any, callback: any): Promise<void> {
-        const connect = () =>
-            this.pool.subscribeMany(this.relayUrls, filters, {
+        const connect = () => {
+            const sub = this.pool.subscribeMany(this.relayUrls, filters, {
                 onevent: (event: Event) => {
                     if (event.created_at * 1000 >= Date.now() - 5000) {
                         if (event.kind === DM) {
@@ -66,11 +66,19 @@ export class NostrService implements OnModuleInit {
                         callback(event);
                     }
                 },
+                oneose: () => {
+                    Logger.log('ONEOSE');
+                    // sub.close();
+                    // connect();
+                },
                 onclose() {
+                    Logger.log('WebSocket connection closed, reconnecting...');
+                    sub.close();
                     connect();
                 }
             })
-        connect()
+        }
+        connect();
     }
 
     async publishDirectMessage(content: string, receiverPublicKey: string): Promise<void> {

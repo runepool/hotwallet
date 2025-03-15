@@ -96,6 +96,20 @@ export class ExchangeClient implements OnModuleInit {
   }
 
   /**
+   * Sends a ping to the exchange server to indicate the client is active
+   * This helps the exchange server track which market makers are online
+   * @returns A promise that resolves when the ping is complete
+   */
+  async ping(): Promise<void> {
+    try {
+      await this.makeAuthenticatedRequest<void>('GET', '/rune-orders/ping');
+    } catch (error) {
+      // Silently handle ping errors to avoid disrupting normal operation
+      console.error('Failed to ping exchange server:', error.message);
+    }
+  }
+
+  /**
    * Creates a new trade on the exchange
    * @param trade The trade details
    * @returns The created trade response

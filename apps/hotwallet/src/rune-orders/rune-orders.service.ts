@@ -21,6 +21,7 @@ export class RuneOrdersService {
   ) {
     setTimeout(() => {
       this.syncOrders();
+      this.pingExchange();
     }, 2000);
   }
 
@@ -154,38 +155,57 @@ export class RuneOrdersService {
     }
   }
 
+  /**
+   * Periodically pings the exchange server to indicate that this hotwallet is active
+   * This helps the exchange track which market makers are online and responsive
+   */
+  @Cron(CronExpression.EVERY_10_SECONDS)
+  async pingExchange() {
+    try {
+      await this.exchangeClient.ping();
+      this.logger.debug('Successfully pinged exchange server');
+    } catch (error) {
+      this.logger.warn(`Failed to ping exchange server: ${error.message}`);
+    }
+  }
+
   @Cron(CronExpression.EVERY_MINUTE)
   async syncOrders() {
-    this.logger.log('Starting order synchronization');
-    const localOrders = await this.dbService.getOrders();
-    const exchangeOrders = await this.exchangeClient.getMyOrders();
+    try {
 
-    this.logger.log(`Found ${localOrders.length} local orders and ${exchangeOrders.length} exchange orders`);
+      this.logger.log('Starting order synchronization');
+      const localOrders = await this.dbService.getOrders();
+      const exchangeOrders = await this.exchangeClient.getMyOrders();
 
-    // Compare orders and update/create/delete as needed  
-    const ordersToCreate = [];
-    const indexes = [];
-    for (const order of localOrders) {
-      const exchangeOrderIndex = exchangeOrders.findIndex(o => o.id === order.id);
-      if (exchangeOrderIndex === -1) {
-        // Order exists in exchange, update status
-        ordersToCreate.push(order)
-      } else {
-        indexes.push(exchangeOrderIndex);
+      this.logger.log(`Found ${localOrders.length} local orders and ${exchangeOrders.length} exchange orders`);
+
+      // Compare orders and update/create/delete as needed  
+      const ordersToCreate = [];
+      const indexes = [];
+      for (const order of localOrders) {
+        const exchangeOrderIndex = exchangeOrders.findIndex(o => o.id === order.id);
+        if (exchangeOrderIndex === -1) {
+          // Order exists in exchange, update status
+          ordersToCreate.push(order)
+        } else {
+          indexes.push(exchangeOrderIndex);
+        }
       }
-    }
 
-    // Delete orders that are not in exchange
-    const ordersToDelete = exchangeOrders.filter((_, index) => !indexes.includes(index));
+      // Delete orders that are not in exchange
+      const ordersToDelete = exchangeOrders.filter((_, index) => !indexes.includes(index));
 
-    if (ordersToCreate.length > 0) {
-      await this.exchangeClient.batchCreateRuneOrders(ordersToCreate);
-    }
-    
-    if (ordersToDelete.length > 0) {
-      await this.exchangeClient.batchDeleteRuneOrders(ordersToDelete.map(o => o.id));
-    }
+      if (ordersToCreate.length > 0) {
+        await this.exchangeClient.batchCreateRuneOrders(ordersToCreate);
+      }
 
-    this.logger.log('Order synchronization completed');
+      if (ordersToDelete.length > 0) {
+        await this.exchangeClient.batchDeleteRuneOrders(ordersToDelete.map(o => o.id));
+      }
+
+      this.logger.log('Order synchronization completed');
+    } catch (error) {
+      this.logger.error(`Failed to sync orders: ${error.message}`);
+    }
   }
 }

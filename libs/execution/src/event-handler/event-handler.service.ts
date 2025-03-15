@@ -178,6 +178,7 @@ export class EventHandlerService {
 
         return result;
     }
+    
     async reserveBidUTXOs(tradeId: string, selectedOrders: { order: RuneOrder; usedAmount: bigint }[]): Promise<string[]> {
         const result = [];
         const runeInfo = await this.runeService.getRuneInfo(selectedOrders[0].order.rune);

@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { EcdsaGuard } from '../guards/ecdsa.guard';
 import { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 import { BatchCreateRuneOrderDto, BatchDeleteRuneOrderDto, CreateRuneOrderDto, UpdateRuneOrderDto } from './dto/rune-orders.dto';
 import { RuneOrdersService } from './rune-orders.service';
+import { MakerGatewayService } from '@app/engine/maker-gateway/maker-gateway.service';
+import { RuneEngineService } from '@app/engine';
 
 @ApiTags('Rune Orders')
 @Controller('rune-orders')
@@ -14,7 +16,17 @@ import { RuneOrdersService } from './rune-orders.service';
 @ApiHeader({ name: 'x-core-public-key', description: 'Core public key used to sign the request' })
 @ApiHeader({ name: 'x-timestamp', description: 'Request timestamp in milliseconds' })
 export class RuneOrdersController {
-  constructor(private readonly ordersService: RuneOrdersService) { }
+  constructor(
+    private readonly engine: RuneEngineService,
+    private readonly ordersService: RuneOrdersService) { }
+
+  @Get('ping')
+  @ApiOperation({ summary: 'Ping endpoint to check if the service is up' })
+  @ApiResponse({ status: 200, description: 'Service is up and running' })
+  ping(@Req() req: AuthenticatedRequest) {
+    Logger.debug(`Ping received from ${req.user.address}`)
+    this.engine.ping(req.user.address);
+  }
 
   @Post('batch/create')
   @ApiOperation({ summary: 'Create multiple rune orders in batch' })

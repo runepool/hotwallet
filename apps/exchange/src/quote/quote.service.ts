@@ -16,7 +16,6 @@ export class QuoteService {
 
   async getQuote(quoteDto: GetQuoteDto): Promise<QuoteResponseDto> {
     const { from, to, amount } = quoteDto;
-    const fromAmount = BigInt(amount);
 
     // Determine if we're buying or selling runes
     const isBuyingRunes = from === 'BTC';
