@@ -79,7 +79,7 @@ export class PendingTransactionsService {
                     const config = await this.autoRebalanceConfigService.get(transaction.rune);
                     if (config && config.enabled) {
 
-                        const orders: any = transaction.orders.split(",").map((order) => {
+                        for (const order of transaction.orders.split(",")) {
                             const [id, amount, price] = order.split(":");
                             const spread = +config.spread;
                             let newPrice: number;
@@ -90,16 +90,26 @@ export class PendingTransactionsService {
                                 newPrice = +price * (1 + spread / 100);
                             }
 
-                            return ({
+
+                            const savedOrder = await this.orderService.getOrderById(id);
+                            if (savedOrder.filledQuantity === savedOrder.quantity) {
+                                const index = ordersToUpdate.findIndex(order => order.id === id);
+                                if (index !== -1) {
+                                    ordersToUpdate[index].status = OrderStatus.CLOSED;
+                                } else {
+                                    savedOrder.status = OrderStatus.CLOSED;
+                                    ordersToUpdate.push(savedOrder);
+                                }
+                            }
+                            newOrders.push({
                                 rune: transaction.rune,
                                 price: BigInt(Math.ceil(newPrice)),
                                 quantity: BigInt(amount),
                                 status: OrderStatus.OPEN,
                                 type: transaction.type === TransactionType.SELL ? RuneOrderType.BID : RuneOrderType.ASK
-                            });
-                        });
+                            } as any);
+                        }
 
-                        newOrders.push(...orders);
                     }
                 }
 

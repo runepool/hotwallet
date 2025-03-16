@@ -168,7 +168,7 @@ export class EventHandlerService {
         pendingTx.confirmations = 0;
         pendingTx.rune = selectedOrders[0].order.rune;
         pendingTx.status = TransactionStatus.PENDING;
-        pendingTx.type = selectedOrders[0].type === 'ask' ? TransactionType.BUY : TransactionType.SELL;
+        pendingTx.type = selectedOrders[0].order.type === 'bid' ? TransactionType.BUY : TransactionType.SELL;
         pendingTx.reservedUtxos = reservedUtxos.join(";");
         const result = await this.manager.transaction(async manager => {
             await manager.save<RuneOrder>(selectedOrders.map(item => item.order));
@@ -283,7 +283,7 @@ export class EventHandlerService {
         // - Validating fee rates are reasonable
 
         const wallet = await this.walletService.getAddress();
-        if (transaction.type == TransactionType.BUY) {
+        if (transaction.type === TransactionType.SELL) {
             const makerOutput = psbt.txOutputs.reverse().find(output => output.address === wallet);
             if (!makerOutput) {
                 throw new Error('Maker output not found in PSBT');

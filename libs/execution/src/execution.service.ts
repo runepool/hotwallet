@@ -18,8 +18,8 @@ export class ExecutionService implements OnModuleInit {
         private readonly eventHandlerService: EventHandlerService,
         private readonly nostrService: NostrService,) { }
 
-    onModuleInit() {
-        this.nostrService.subscribeToEvent([
+    async onModuleInit() {
+        await this.nostrService.subscribeToEvent([
             {
                 kinds: [DM],
                 '#p': [this.nostrService.publicKey],

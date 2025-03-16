@@ -101,6 +101,15 @@ export class RuneOrdersService {
     return await this.dbService.getOrders(asset, status);
   }
 
+  /**
+   * Gets only active (open) orders
+   * @param asset Optional asset (rune) to filter by
+   * @returns Promise resolving to an array of active orders
+   */
+  async getActiveOrders(asset?: string): Promise<RuneOrder[]> {
+    return await this.dbService.getOrders(asset, 'open');
+  }
+
   async getOrderById(orderId: string): Promise<RuneOrder | null> {
     return await this.dbService.getOrderById(orderId);
   }

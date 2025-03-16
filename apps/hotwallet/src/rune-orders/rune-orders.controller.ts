@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CreateRuneOrderDto, CreateBatchRuneOrderDto } from '../dto/rune-orders.dto';
 import { RuneOrdersService } from './rune-orders.service';
@@ -29,6 +29,13 @@ export class RuneOrdersController {
   @ApiResponse({ status: 200, description: 'Orders retrieved successfully.' })
   async getOrders() {
     return this.ordersService.getOrders();
+  }
+
+  @Get('active')
+  @ApiOperation({ summary: 'Get active orders' })
+  @ApiResponse({ status: 200, description: 'Active orders retrieved successfully.' })
+  async getActiveOrders(@Query('asset') asset?: string) {
+    return this.ordersService.getActiveOrders(asset);
   }
 
   @Get(':orderId')
