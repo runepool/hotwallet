@@ -5,8 +5,8 @@
 
 # Default values
 BRANCH="main"
-REPO_URL="https://github.com/pxr64/rune-pool-maker-app.git"
-WEBAPP_REPO_URL="https://github.com/pxr64/runpool-maker-webapp.git"
+REPO_URL="https://github.com/runepool/hotwallet.git"
+WEBAPP_REPO_URL="https://github.com/runepool/hotwallet-ui.git"
 INSTALL_DIR="$HOME/runepool-dex"
 
 # Parse command line arguments
