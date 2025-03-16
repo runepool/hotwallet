@@ -66,6 +66,7 @@ export class EventHandlerService {
         const pubkey = await this.walletService.getPublicKey();
         const signableInputs = data.inputsToSign.filter(input => input.signerAddress === pubkey);
         const signedPsbt = this.walletService.signPsbt(psbt, signableInputs.map(input => input.index));
+        Logger.debug('Sending sign response');
         await this.nostrService.publishDirectMessage(JSON.stringify(
             Object.assign(new Message<SignResponse>(), {
                 type: 'sign_response',
@@ -90,6 +91,7 @@ export class EventHandlerService {
 
             try {
                 const reservedUtxos = await this.reserveOrders(message.data);
+                Logger.debug(`Reserved UTXOs done...`);
                 await this.nostrService.publishDirectMessage(JSON.stringify(
                     Object.assign(new Message<ReserveOrdersResponse>(), {
                         type: 'reserve_response',
@@ -151,14 +153,42 @@ export class EventHandlerService {
         } else if (orderType === 'bid') {
             reservedUtxos = await this.reserveBidUTXOs(fillOrderRequest.tradeId, selectedOrders);
         }
-        
+
         const runeAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount, 0n).toString();
         let satsAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount * BigInt(curr.order.price), 0n);
         const runeInfo = await this.runeService.getRuneInfo(selectedOrders[0].order.rune);
 
         satsAmount = satsAmount / BigInt(10 ** runeInfo.decimals);
 
+        // Check if a transaction with this tradeId already exists
+        const existingTransaction = await this.manager.getRepository(Transaction).findOne({
+            where: { tradeId: fillOrderRequest.tradeId }
+        });
+
         const avgPrice = selectedOrders.reduce((prev, curr) => prev += Number(curr.order.price), 0) / selectedOrders.length;
+
+        if (existingTransaction) {
+            Logger.log(`Transaction for trade ID ${fillOrderRequest.tradeId} already exists, updating with new order details`);
+
+            // Update the existing transaction with new order details
+            const newOrdersString = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.price}`).join(",");
+
+            existingTransaction.orders = existingTransaction.orders + "," + newOrdersString;
+            existingTransaction.amount = (BigInt(existingTransaction.amount) + BigInt(runeAmount)).toString();
+            existingTransaction.satsAmount = (BigInt(existingTransaction.satsAmount) + BigInt(satsAmount)).toString();
+            existingTransaction.price = (Number(+(existingTransaction.price) + avgPrice) / 2).toString();
+            // Keep the existing reservedUtxos
+            const existingUtxos = existingTransaction.reservedUtxos.split(';');
+
+            // Save the updated transaction and orders
+            await this.manager.transaction(async manager => {
+                await manager.save<RuneOrder>(selectedOrders.map(item => item.order));
+                await manager.save(existingTransaction);
+            });
+
+            return reservedUtxos;
+        }
+
         const pendingTx = new Transaction();
         pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.price}`).join(",");
         pendingTx.amount = runeAmount;
@@ -179,7 +209,7 @@ export class EventHandlerService {
 
         return result;
     }
-    
+
     async reserveBidUTXOs(tradeId: string, selectedOrders: { order: RuneOrder; usedAmount: bigint }[]): Promise<string[]> {
         const result = [];
         const runeInfo = await this.runeService.getRuneInfo(selectedOrders[0].order.rune);
@@ -294,7 +324,7 @@ export class EventHandlerService {
                 throw new Error('Maker received incorrect amount of sats');
             }
         } else {
-            const edictIndex  = psbt.txOutputs.findIndex(output => output.value === 0);
+            const edictIndex = psbt.txOutputs.findIndex(output => output.value === 0);
             const makerOutputIndex = psbt.txOutputs.findIndex((output, index) => index < edictIndex && output.address === wallet);
             const edicts = Runestone.decipher(psbt.data.getTransaction().toString('hex')).value().edicts;
             const edict = edicts.find(edict => edict.output === makerOutputIndex);
@@ -307,4 +337,3 @@ export class EventHandlerService {
         return true; // Validation passed
     }
 }
-

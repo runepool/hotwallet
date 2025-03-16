@@ -33,10 +33,12 @@ export class ExecutionService implements OnModuleInit {
 
                 if (message.type === 'reserve_request') {
                     await this.eventHandlerService.handleReserveRequest(message, event);
+                    return;
                 }
 
                 if (message.type === 'sign_request') {
                     await this.eventHandlerService.handleSignRequest(message, event);
+                    return;
                 }
 
                 if (message.type === 'ping') {
@@ -47,6 +49,7 @@ export class ExecutionService implements OnModuleInit {
                                 timestamp: Date.now()
                             }
                         })), event.pubkey);
+                    return;
                 }
             } catch (error) {
                 console.error("Error", error);

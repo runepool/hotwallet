@@ -4,10 +4,12 @@ import * as secp from "@noble/curves/secp256k1";
 import { createCipheriv, createDecipheriv, randomFillSync } from 'crypto';
 import { Event, finalizeEvent, getPublicKey, SimplePool } from 'nostr-tools';
 import * as WebSocket from 'ws';
-import { DM, PUB_EVENT } from './constants';
+import { DM } from './constants';
 
 @Injectable()
 export class NostrService implements OnModuleInit {
+    events: { [id: string]: boolean } = {};
+
     private readonly relayUrls = [
         'wss://relay.runepool.org',
     ];
@@ -59,6 +61,10 @@ export class NostrService implements OnModuleInit {
         const connect = () => {
             const sub = this.pool.subscribeMany(this.relayUrls, filters, {
                 onevent: (event: Event) => {
+                    if (this.events[event.id]) {
+                        return;
+                    }
+                    this.events[event.id] = true;
                     if (event.created_at * 1000 >= Date.now() - 5000) {
                         if (event.kind === DM) {
                             event.content = this.decryptEventContent(event);
@@ -69,7 +75,6 @@ export class NostrService implements OnModuleInit {
                 oneose: () => {
                     Logger.log('ONEOSE');
                     // sub.close();
-                    // connect();
                 },
                 onclose() {
                     Logger.log('WebSocket connection closed, reconnecting...');

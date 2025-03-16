@@ -26,7 +26,7 @@ export class PendingTransactionsService {
     }
 
     // Cron job to process pending transactions every minute
-    @Cron(CronExpression.EVERY_MINUTE)
+    @Cron(CronExpression.EVERY_30_SECONDS)
     async handlePendingTransactions() {
         Logger.log('Running cron job to manage pending transactions...');
         if (this.isProcessing) return;
@@ -72,6 +72,7 @@ export class PendingTransactionsService {
                 }
 
                 transaction.confirmations = txInfo.status.block_height ? currentBlock - txInfo.status.block_height + 1 : 0;
+                transaction.txid = txInfo.status.txid;
                 transaction.status = TransactionStatus.CONFIRMING;
                 if (transaction.confirmations >= 1 && transaction.status !== TransactionStatus.CONFIRMED) {
                     transaction.status = TransactionStatus.CONFIRMED;
@@ -85,9 +86,9 @@ export class PendingTransactionsService {
                             let newPrice: number;
 
                             if (transaction.type === TransactionType.BUY) {
-                                newPrice = +price * (1 - spread / 100);
-                            } else {
                                 newPrice = +price * (1 + spread / 100);
+                            } else {
+                                newPrice = +price * (1 - spread / 100);
                             }
 
 

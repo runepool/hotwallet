@@ -188,24 +188,15 @@ export class RuneOrdersService {
 
       this.logger.log(`Found ${localOrders.length} local orders and ${exchangeOrders.length} exchange orders`);
 
-      // Compare orders and update/create/delete as needed  
-      const ordersToCreate = [];
-      const indexes = [];
-      for (const order of localOrders) {
-        const exchangeOrderIndex = exchangeOrders.findIndex(o => o.id === order.id);
-        if (exchangeOrderIndex === -1) {
-          // Order exists in exchange, update status
-          ordersToCreate.push(order)
-        } else {
-          indexes.push(exchangeOrderIndex);
-        }
-      }
 
       // Delete orders that are not in exchange
-      const ordersToDelete = exchangeOrders.filter((_, index) => !indexes.includes(index));
+      const ordersToDelete = exchangeOrders.filter((_, index) => {
+        const localOrderIndex = localOrders.findIndex(o => o.id === exchangeOrders[index].id);
+        return localOrderIndex === -1;
+      });
 
-      if (ordersToCreate.length > 0) {
-        await this.exchangeClient.batchCreateRuneOrders(ordersToCreate);
+      if (localOrders.length > 0) {
+        await this.exchangeClient.batchCreateRuneOrders(localOrders as any);
       }
 
       if (ordersToDelete.length > 0) {
