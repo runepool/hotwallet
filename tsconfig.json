@@ -49,10 +49,10 @@
         "libs/nostr/src/*"
       ],
       "@app/exchange-database": [
-        "libs/exchange-database/src"
+        "../rune-pool-exchange/libs/exchange-database/src"
       ],
       "@app/exchange-database/*": [
-        "libs/exchange-database/src/*"
+        "../rune-pool-exchange/libs/exchange-database/src/*"
       ],
       "@app/execution": [
         "libs/execution/src"

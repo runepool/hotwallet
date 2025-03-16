@@ -8,7 +8,7 @@ import { RuneOrder, RuneOrderType } from '@app/database/entities/rune-order.enti
 import { RuneOrdersService } from '@app/database/rune-orders/rune-orders-database.service';
 import { TransactionStatus, TransactionType } from '@app/database/entities/transaction.entity';
 import { AutoRebalanceConfigService } from '@app/database/auto-rebalance/auto-rebalance.service';
-import { OrderStatus } from '@app/exchange-database/entities/rune-order.entity';
+import { OrderStatus } from '../../../../../rune-pool-exchange/libs/exchange-database/src/entities/rune-order.entity';
 
 @Injectable()
 export class PendingTransactionsService {

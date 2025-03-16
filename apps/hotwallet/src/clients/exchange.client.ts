@@ -3,7 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { CreateTradeDto, OrderSide } from '../../../exchange/src/dto/trade.dto';
 import { BatchCreateRuneOrderDto, BatchDeleteRuneOrderDto, CreateRuneOrderDto, UpdateRuneOrderDto } from '../../../exchange/src/rune-orders/dto/rune-orders.dto';
-import { RuneOrder } from '@app/exchange-database/entities/rune-order.entity';
+import { RuneOrder } from '../../../../../rune-pool-exchange/libs/exchange-database/src/entities/rune-order.entity';
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { createHash } from 'crypto';
 import { DatabaseSettingsService } from '@app/database/settings/settings.service';

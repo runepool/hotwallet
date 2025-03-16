@@ -64,24 +64,6 @@
         "tsConfigPath": "libs/nostr/tsconfig.lib.json"
       }
     },
-    "exchange": {
-      "type": "application",
-      "root": "apps/exchange",
-      "entryFile": "main",
-      "sourceRoot": "apps/exchange/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/exchange/tsconfig.app.json"
-      }
-    },
-    "exchange-database": {
-      "type": "library",
-      "root": "libs/exchange-database",
-      "entryFile": "index",
-      "sourceRoot": "libs/exchange-database/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/exchange-database/tsconfig.lib.json"
-      }
-    },
     "execution": {
       "type": "library",
       "root": "libs/execution",

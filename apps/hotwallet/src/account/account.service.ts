@@ -10,7 +10,7 @@ import { RunesService } from '@app/blockchain/runes/runes.service';
 import { appendUnspentOutputsAsNetworkFee } from '@app/blockchain/psbtUtils';
 import { AutoSplitConfigService } from '@app/database/auto-split/auto-split.service';
 import { TransactionType } from '@app/database/entities/transaction.entity';
-import { TransactionStatus } from '@app/exchange-database/entities/transaction.entity';
+import { TransactionStatus } from '../../../../../rune-pool-exchange/libs/exchange-database/src/entities/transaction.entity';
 
 type OutputHealth = {
   location: string;
