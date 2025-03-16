@@ -38,12 +38,6 @@ export class OrdClient implements OnModuleInit {
   }
 
   async updateEndpoint() {
-    console.log('ORD_URL', process.env.ORD_URL);
-    if (process.env.ORD_URL) {
-      this.endpoint = process.env.ORD_URL;
-      return;
-    }
-
     const settings = await this.settingsService.getSettings();
     this.endpoint = settings.ordUrl;
     if (!this.endpoint) {
