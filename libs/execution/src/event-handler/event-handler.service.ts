@@ -1,11 +1,10 @@
 import { Transaction, TransactionStatus, TransactionType } from '@app/database/entities/transaction.entity';
 
-import { NostrService } from '@app/nostr';
+import { WebSocketService } from '@app/websocket';
 import { BitcoinWalletService } from '@app/wallet';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectEntityManager } from '@nestjs/typeorm';
 import { Psbt } from 'bitcoinjs-lib';
-import { Event } from 'nostr-tools';
 import { EntityManager } from 'typeorm/entity-manager/EntityManager';
 import { Message, ReserveOrdersRequest, ReserveOrdersResponse, SignRequest, SignResponse } from '../types';
 import { RunesService } from '@app/blockchain/runes/runes.service';
@@ -34,7 +33,7 @@ export class EventHandlerService {
         private readonly bitcoinService: BlockchainService,
         private readonly runeService: RunesService,
         private readonly walletService: BitcoinWalletService,
-        private readonly nostrService: NostrService) {
+        private readonly webSocketService: WebSocketService) {
 
         // Set up periodic cleanup of expired reservations
         setInterval(() => this.cleanupExpiredReservations(), 10 * 1000); // Run every minute
@@ -59,7 +58,7 @@ export class EventHandlerService {
         }
     }
 
-    async handleSignRequest(message: Message<SignRequest>, event: Event) {
+    async handleSignRequest(message: Message<SignRequest>, event: any) {
         const data = message.data;
         const psbt = Psbt.fromBase64(data.psbtBase64);
         await this.validatePsbt(psbt, data.tradeId);
@@ -67,7 +66,7 @@ export class EventHandlerService {
         const signableInputs = data.inputsToSign.filter(input => input.signerAddress === pubkey);
         const signedPsbt = this.walletService.signPsbt(psbt, signableInputs.map(input => input.index));
         Logger.debug('Sending sign response');
-        await this.nostrService.publishDirectMessage(JSON.stringify(
+        await this.webSocketService.publishDirectMessage(JSON.stringify(
             Object.assign(new Message<SignResponse>(), {
                 type: 'sign_response',
                 data: {
@@ -75,10 +74,10 @@ export class EventHandlerService {
                     signedPsbtBase64: signedPsbt.toBase64()
                 }
             })
-        ), event.pubkey);
+        ), event.sender);
     }
 
-    async handleReserveRequest(message: Message<ReserveOrdersRequest>, event: Event) {
+    async handleReserveRequest(message: Message<ReserveOrdersRequest>, event: any) {
         try {
             // Implement a simple lock mechanism
             const lockId = `reserve-${message.data.tradeId}`;
@@ -92,7 +91,7 @@ export class EventHandlerService {
             try {
                 const reservedUtxos = await this.reserveOrders(message.data);
                 Logger.debug(`Reserved UTXOs done...`);
-                await this.nostrService.publishDirectMessage(JSON.stringify(
+                await this.webSocketService.publishDirectMessage(JSON.stringify(
                     Object.assign(new Message<ReserveOrdersResponse>(), {
                         type: 'reserve_response',
                         data: {
@@ -101,7 +100,7 @@ export class EventHandlerService {
                             reservedUtxos
                         }
                     } as Message<ReserveOrdersResponse>)
-                ), event.pubkey);
+                ), event.sender);
             } finally {
                 // Always release the lock
                 delete this.locks[lockId];
@@ -110,7 +109,7 @@ export class EventHandlerService {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error during reservation';
             console.error(`Reserve error: ${errorMessage}`, error);
 
-            await this.nostrService.publishDirectMessage(JSON.stringify(
+            await this.webSocketService.publishDirectMessage(JSON.stringify(
                 Object.assign(new Message<ReserveOrdersResponse>(), {
                     type: 'reserve_response',
                     data: {
@@ -120,7 +119,7 @@ export class EventHandlerService {
                         error: errorMessage
                     }
                 } as Message<ReserveOrdersResponse>)
-            ), event.pubkey);
+            ), event.sender);
         }
     }
 

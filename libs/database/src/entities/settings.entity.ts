@@ -14,12 +14,6 @@ export class SettingsEntity {
   @Column('simple-array')
   nostrRelays: string[];
 
-  @Column({ nullable: true })
-  nostrPrivateKey: string;
-
-  @Column({ nullable: true })
-  nostrPublicKey: string;
-
   @UpdateDateColumn()
   updatedAt: Date;
 }

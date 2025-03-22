@@ -155,8 +155,8 @@ export class RuneOrdersService {
 
       this.logger.log(`Exchange batch delete result: ${result.deletedCount} orders deleted successfully`);
 
-      if (result.errors && result.errors.length > 0) {
-        this.logger.warn(`Some orders failed to delete on exchange: ${result.errors.join(', ')}`);
+      if (!result.success) {
+        this.logger.warn(`Some orders failed to delete on exchange`);
       }
     } catch (error) {
       this.logger.error(`Error in batch delete operation: ${error.message}`);

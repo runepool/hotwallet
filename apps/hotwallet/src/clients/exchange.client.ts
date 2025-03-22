@@ -12,7 +12,6 @@ import { CreateTradeDto } from './dto/trade.dto';
 export class ExchangeClient implements OnModuleInit {
   private readonly baseUrl = process.env.NODE_ENV === 'production' ? 'https://exchange-api.runepool.org' : 'http://localhost:3001';
   private walletKey: string;
-  private nostryKey: string;
 
   constructor(
     private readonly settingsService: DatabaseSettingsService,
@@ -22,17 +21,16 @@ export class ExchangeClient implements OnModuleInit {
   }
   async onModuleInit() {
     const settings = await this.settingsService.getSettings();
-    this.updateKeys(settings.nostrPrivateKey, settings.bitcoinPrivateKey);
+    this.updateKeys(settings.bitcoinPrivateKey);
   }
 
-  public updateKeys(nostrKey: string, walletKey: string) {
-    this.nostryKey = nostrKey;
+  public updateKeys(walletKey: string) {
     this.walletKey = walletKey;
   }
 
-  private async signRequest(method: string, path: string, body?: any): Promise<{ nostrSignature: string; coreSignature: string; timestamp: string }> {
-    if (!this.nostryKey || !this.walletKey) {
-      throw new Error('Nostr private key not set. Call setPrivateKey first.');
+  private async signRequest(method: string, path: string, body?: any): Promise<{ coreSignature: string; timestamp: string }> {
+    if (!this.walletKey) {
+      throw new Error('Wallet private key not set. Call setPrivateKey first.');
     }
 
     const timestamp = Date.now().toString();
@@ -49,18 +47,12 @@ export class ExchangeClient implements OnModuleInit {
     );
 
     // Sign the message
-    const nostrSignatureBytes = secp256k1.sign(
-      messageHashBytes,
-      this.nostryKey
-    );
-
     const coreSignatureBytes = secp256k1.sign(
       messageHashBytes,
       this.walletKey
     );
 
     return {
-      nostrSignature: nostrSignatureBytes.toCompactHex(),
       coreSignature: coreSignatureBytes.toCompactHex(),
       timestamp
     };
@@ -71,14 +63,11 @@ export class ExchangeClient implements OnModuleInit {
     path: string,
     body?: any
   ): Promise<T> {
-    const { nostrSignature, coreSignature, timestamp } = await this.signRequest(method, path, body);
-    const nostrPublicKey = Buffer.from(secp256k1.getPublicKey(this.nostryKey, true)).toString('hex');
+    const { coreSignature, timestamp } = await this.signRequest(method, path, body);
     const corePublicKey = Buffer.from(secp256k1.getPublicKey(this.walletKey, true)).toString('hex');
 
     const headers = {
-      'x-nostr-signature': nostrSignature,
       'x-core-signature': coreSignature,
-      'x-nostr-public-key': nostrPublicKey,
       'x-core-public-key': corePublicKey,
       'x-timestamp': timestamp
     };
@@ -199,53 +188,38 @@ export class ExchangeClient implements OnModuleInit {
    * const updatedOrder = await exchangeClient.updateRuneOrder('order-id', {
    *   quantity: BigInt(2000000),
    *   price: BigInt(51000),
-   *   status: OrderStatus.CLOSED
    * });
    */
   async updateRuneOrder(id: string, updateData: UpdateRuneOrderDto): Promise<RuneOrder> {
-    return this.makeAuthenticatedRequest('PATCH', `/rune-orders/${id}`, updateData);
-  }
-
-  /**
-   * Cancels/removes a rune order
-   * @param id The order ID to cancel
-   */
-  async cancelRuneOrder(id: string): Promise<void> {
-    return this.makeAuthenticatedRequest('DELETE', `/rune-orders/${id}`);
+    return this.makeAuthenticatedRequest('PUT', `/rune-orders/${id}`, updateData);
   }
 
   /**
    * Deletes a rune order
-   * @param orderId The order ID to delete
+   * @param id The order ID
+   * @returns A success indicator
    */
-  async deleteRuneOrder(orderId: string): Promise<void> {
-    await this.makeAuthenticatedRequest<void>('DELETE', `/rune-orders/${orderId}`);
+  async deleteRuneOrder(id: string): Promise<{ success: boolean }> {
+    return this.makeAuthenticatedRequest('DELETE', `/rune-orders/${id}`);
   }
 
   /**
-   * Deletes multiple rune orders in a batch operation
-   * @param orderIds Array of order IDs to delete
-   * @returns Result of the batch delete operation with count of deleted orders and any errors
+   * Deletes multiple rune orders in a single batch operation
+   * @param ids Array of order IDs to delete
+   * @returns Result of the batch delete operation
    * @example
-   * const result = await exchangeClient.batchDeleteRuneOrders([
-   *   'order-id-1',
-   *   'order-id-2',
-   *   'order-id-3'
-   * ]);
+   * const result = await exchangeClient.batchDeleteRuneOrders(['order-id-1', 'order-id-2']);
    * console.log(`Successfully deleted ${result.deletedCount} orders`);
-   * if (result.errors) {
-   *   console.warn(`Errors: ${result.errors.join(', ')}`);
-   * }
    */
-  async batchDeleteRuneOrders(orderIds: string[]): Promise<{ success: boolean; deletedCount: number; errors?: string[] }> {
-    const batchDeleteDto: BatchDeleteRuneOrderDto = { orderIds };
-    return this.makeAuthenticatedRequest('DELETE', '/rune-orders/batch/delete', batchDeleteDto);
+  async batchDeleteRuneOrders(ids: string[]): Promise<{ success: boolean; deletedCount: number }> {
+    const batchDeleteDto: BatchDeleteRuneOrderDto = { orderIds: ids };
+    return this.makeAuthenticatedRequest('POST', '/rune-orders/batch/delete', batchDeleteDto);
   }
 
   /**
-   * Retrieves all rune orders belonging to the authenticated user
-   * @returns Array of rune orders owned by the authenticated user
-   */
+  * Retrieves all rune orders belonging to the authenticated user
+  * @returns Array of rune orders owned by the authenticated user
+  */
   async getMyOrders(): Promise<RuneOrder[]> {
     return this.makeAuthenticatedRequest('GET', '/rune-orders/my-orders');
   }

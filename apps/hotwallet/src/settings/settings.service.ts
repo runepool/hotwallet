@@ -3,7 +3,7 @@ import { UserSettings } from './settings.controller';
 import { DatabaseSettingsService } from '@app/database/settings/settings.service';
 import { BitcoinWalletService } from '@app/wallet';
 import { OrdClient } from '@app/blockchain/common/ord-client/client';
-import { NostrService } from '@app/nostr';
+import { WebSocketService } from '@app/websocket';
 import { ExchangeClient } from '../clients/exchange.client';
 
 @Injectable()
@@ -11,7 +11,7 @@ export class SettingsService {
   constructor(
     private readonly walletService: BitcoinWalletService,
     private readonly ordClient: OrdClient,
-    private readonly nostrService: NostrService,
+    private readonly webSocketService: WebSocketService,
     private readonly exchangeClient: ExchangeClient,
     private readonly dbSettingsService: DatabaseSettingsService) { }
 
@@ -21,8 +21,6 @@ export class SettingsService {
       bitcoinPrivateKey: settings.bitcoinPrivateKey ? 'xxx' : '',
       ordUrl: settings.ordUrl,
       nostrRelays: settings.nostrRelays,
-      nostrPrivateKey: settings.nostrPrivateKey ? 'xxx' : '',
-      nostrPublicKey: settings.nostrPublicKey,
     };
   }
 
@@ -31,8 +29,6 @@ export class SettingsService {
       bitcoinPrivateKey: newSettings.bitcoinPrivateKey,
       ordUrl: newSettings.ordUrl,
       nostrRelays: newSettings.nostrRelays,
-      nostrPrivateKey: newSettings.nostrPrivateKey,
-      nostrPublicKey: newSettings.nostrPublicKey,
     });
 
     // Reinitialize wallet if bitcoin private key changes
@@ -44,16 +40,6 @@ export class SettingsService {
     // Update OrdClient if ordUrl changes
     if (newSettings.ordUrl) {
       await this.ordClient.updateEndpoint();
-    }
-
-    // Update Nostr if private key changes
-    if (newSettings.nostrPrivateKey) {
-      await this.nostrService.updateKeys();
-    }
-
-     // Update Nostr if private key changes
-     if (newSettings.nostrPrivateKey) {
-      this.exchangeClient.updateKeys(newSettings.nostrPrivateKey, newSettings.bitcoinPrivateKey);
     }
   }
 }

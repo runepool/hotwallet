@@ -1,10 +1,7 @@
-import { NostrService } from '@app/nostr';
-import { DM } from '@app/nostr/constants';
+import { WebSocketService } from '@app/websocket';
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { Event } from 'nostr-tools';
 import { Message, Pong } from './types';
 
-import { PendingTransactionsService } from 'apps/hotwallet/src/pending-transactions/pending-transactions.service';
 import { EventHandlerService } from './event-handler/event-handler.service';
 
 export const MAKER_BONUS = 100;
@@ -16,15 +13,12 @@ export class ExecutionService implements OnModuleInit {
 
     constructor(
         private readonly eventHandlerService: EventHandlerService,
-        private readonly nostrService: NostrService,) { }
+        private readonly webSocketService: WebSocketService,) { }
 
     async onModuleInit() {
-        await this.nostrService.subscribeToEvent([
-            {
-                kinds: [DM],
-                '#p': [this.nostrService.publicKey],
-            }
-        ], async (event: Event) => {
+        await this.webSocketService.subscribeToEvent({
+            recipient: this.webSocketService.clientId
+        }, async (event: any) => {
             try {
                 const message: Message<any> = Object.assign(
                     new Message<any>(),
@@ -42,18 +36,18 @@ export class ExecutionService implements OnModuleInit {
                 }
 
                 if (message.type === 'ping') {
-                    await this.nostrService.publishDirectMessage(JSON.stringify(
+                    await this.webSocketService.publishDirectMessage(JSON.stringify(
                         Object.assign(new Message<Pong>(), {
                             type: 'pong',
                             data: {
                                 timestamp: Date.now()
                             }
-                        })), event.pubkey);
+                        })), event.sender);
                     return;
                 }
             } catch (error) {
                 console.error("Error", error);
-                // Logger.error("Could not decode nostr event")
+                // Error handling for WebSocket events
             }
         })
     }

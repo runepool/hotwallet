@@ -64,13 +64,13 @@
     "ecpair": "^2.1.0",
     "express-basic-auth": "^1.2.1",
     "nestjs-axios-retry": "^1.0.7",
-    "nostr-tools": "^2.10.4",
     "pg": "^8.13.1",
     "reflect-metadata": "^0.1.13",
     "runelib": "^1.0.7",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.20",
+    "uuid": "^11.1.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

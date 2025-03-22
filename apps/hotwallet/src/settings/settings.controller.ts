@@ -7,8 +7,6 @@ export class UserSettings {
   bitcoinPrivateKey: string;
   ordUrl: string;
   nostrRelays: string[];
-  nostrPrivateKey: string;
-  nostrPublicKey: string; // Derived from private key, read-only
 }
 
 
