@@ -172,7 +172,6 @@ export class RuneOrdersService {
   async pingExchange() {
     try {
       await this.exchangeClient.ping();
-      this.logger.debug('Successfully pinged exchange server');
     } catch (error) {
       this.logger.warn(`Failed to ping exchange server: ${error.message}`);
     }

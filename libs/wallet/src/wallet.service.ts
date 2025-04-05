@@ -43,7 +43,7 @@ export class BitcoinWalletService {
             }
 
             this._signer = this.importWalletFromPrivateKey(this._privateKey);
-            this._publicKey = toXOnly(this._signer.publicKey).toString("hex");
+            this._publicKey = this._signer.publicKey.toString("hex");
             this._address = this.generateP2TRAddress().address;
             console.log('Bitcoin wallet initialized:', this.generateP2TRAddress().address);
         } catch (error) {

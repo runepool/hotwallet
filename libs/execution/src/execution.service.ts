@@ -30,6 +30,12 @@ export class ExecutionService implements OnModuleInit {
                     return;
                 }
 
+                if (message.type === 'reserve_cancel') {
+                    await this.eventHandlerService.handleReserveCancel(message, event);
+                    return;
+                }
+
+
                 if (message.type === 'sign_request') {
                     await this.eventHandlerService.handleSignRequest(message, event);
                     return;
@@ -42,8 +48,8 @@ export class ExecutionService implements OnModuleInit {
                             data: {
                                 timestamp: Date.now()
                             }
-                        })), event.sender);
-                    return;
+                        })));
+
                 }
             } catch (error) {
                 console.error("Error", error);

@@ -65,8 +65,6 @@ export class WebSocketService implements OnModuleInit {
                 this.wsConnection.on('message', (message: string) => {
                     try {
                         const parsedMessage = JSON.parse(message.toString());
-                        this.logger.debug(`Received message: ${JSON.stringify(parsedMessage)}`);
-
                         // Handle messages
                         if (parsedMessage.type === 'message') {
                             this.handleIncomingMessage(parsedMessage.content, parsedMessage.sender);
@@ -117,7 +115,6 @@ export class WebSocketService implements OnModuleInit {
     private handleIncomingMessage(message: any, sender: string) {
         // Create a simplified event object
         const event = {
-            sender: sender,
             timestamp: Date.now(),
             content: message,
             recipient: this.clientId
@@ -136,10 +133,6 @@ export class WebSocketService implements OnModuleInit {
 
     private eventMatchesFilter(event: any, filter: any): boolean {
         // Basic filter matching logic
-        if (filter.sender && filter.sender !== event.sender) {
-            return false;
-        }
-
         if (filter.recipient && filter.recipient !== event.recipient) {
             return false;
         }
@@ -174,7 +167,7 @@ export class WebSocketService implements OnModuleInit {
     }
 
     // Send a direct message to another client
-    async publishDirectMessage(content: string, receiverId: string): Promise<void> {
+    async publishDirectMessage(content: string): Promise<void> {
         if (!this.wsConnection || this.wsConnection.readyState !== WebSocket.OPEN) {
             try {
                 await this.connectToServer();
@@ -188,12 +181,11 @@ export class WebSocketService implements OnModuleInit {
             this.wsConnection.send(JSON.stringify({
                 type: 'message',
                 sender: this.clientId,
-                receiver: receiverId,
                 content: content
             }));
-            this.logger.debug(`Sent message to ${receiverId}`);
+            this.logger.debug(`Sent message`);
         } catch (error) {
-            this.logger.error(`Failed to send message to ${receiverId}: ${error.message}`);
+            this.logger.error(`Failed to send message: ${error.message}`);
             throw error;
         }
     }

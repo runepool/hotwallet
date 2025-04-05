@@ -74,7 +74,84 @@ export class EventHandlerService {
                     signedPsbtBase64: signedPsbt.toBase64()
                 }
             })
-        ), event.sender);
+        ));
+    }
+
+    async handleReserveCancel(message: Message<{tradeId: string}>, event: any) {
+        try {
+            const { tradeId } = message.data;
+            Logger.debug(`Received reserve cancel for trade ${tradeId}`);
+            
+            // Find all UTXOs reserved for this trade ID
+            const reservedUtxosForTrade = Object.entries(this.reservedUtxos)
+                .filter(([_, data]) => data.tradeId === tradeId)
+                .map(([utxo]) => utxo);
+            
+            if (reservedUtxosForTrade.length === 0) {
+                Logger.debug(`No UTXOs found for trade ${tradeId}`);
+                return;
+            }
+            
+            // Release all reserved UTXOs for this trade
+            Logger.debug(`Releasing ${reservedUtxosForTrade.length} UTXOs for trade ${tradeId}`);
+            reservedUtxosForTrade.forEach(utxo => {
+                delete this.reservedUtxos[utxo];
+            });
+            
+            // Release the lock if it exists
+            const lockId = `reserve-${tradeId}`;
+            if (this.locks && this.locks[lockId]) {
+                delete this.locks[lockId];
+            }
+            
+            // Update transaction status and reset order filled quantities
+            try {
+                const transaction = await this.manager.getRepository(Transaction).findOne({ where: { tradeId } });
+                if (transaction && transaction.status === TransactionStatus.PENDING) {
+                    // Parse the orders string to get order IDs and used amounts
+                    const orderEntries = transaction.orders.split(',').map(entry => {
+                        const [orderId, usedAmount] = entry.split(':');
+                        return { orderId, usedAmount: BigInt(usedAmount) };
+                    });
+                    
+                    // Get all order objects
+                    const ordersRepo = this.manager.getRepository(RuneOrder);
+                    const orders = await Promise.all(
+                        orderEntries.map(async entry => {
+                            const order = await ordersRepo.findOne({ where: { id: entry.orderId } });
+                            if (order) {
+                                // Decrease the filled quantity by the amount that was reserved
+                                order.filledQuantity -= entry.usedAmount;
+                                Logger.debug(`Decreased filled quantity for order ${order.id} by ${entry.usedAmount}`);
+                            }
+                            return order;
+                        })
+                    );
+                    
+                    // Filter out any null orders
+                    const validOrders = orders.filter(order => order !== null);
+                    
+                    // Update transaction status and save orders
+                    transaction.status = TransactionStatus.ERRORED;
+                    
+                    await this.manager.transaction(async manager => {
+                        // Save all orders with updated filled quantities
+                        if (validOrders.length > 0) {
+                            await manager.save(validOrders);
+                        }
+                        await manager.save(transaction);
+                    });
+                    
+                    Logger.debug(`Updated transaction status to ERRORED and reset filled quantities for trade ${tradeId}`);
+                }
+            } catch (error) {
+                Logger.error(`Error updating transaction status and order quantities: ${error.message}`);
+            }
+            
+            Logger.debug(`Successfully cancelled reservation for trade ${tradeId}`);
+        } catch (error) {
+            Logger.error(`Error handling reserve cancel: ${error.message}`);
+        }
     }
 
     async handleReserveRequest(message: Message<ReserveOrdersRequest>, event: any) {
@@ -100,7 +177,7 @@ export class EventHandlerService {
                             reservedUtxos
                         }
                     } as Message<ReserveOrdersResponse>)
-                ), event.sender);
+                ));
             } finally {
                 // Always release the lock
                 delete this.locks[lockId];
@@ -119,7 +196,7 @@ export class EventHandlerService {
                         error: errorMessage
                     }
                 } as Message<ReserveOrdersResponse>)
-            ), event.sender);
+            ));
         }
     }
 
@@ -135,6 +212,7 @@ export class EventHandlerService {
             if (order.filledQuantity + BigInt(orderFill.amount) > order.quantity) {
                 throw new Error(`Order ${orderFill.orderId} quantity exceeded`);
             }
+            
             order.filledQuantity += BigInt(orderFill.amount);
             Logger.debug(`Order ${orderFill.orderId} filled quantity: ${order.filledQuantity}`);
             selectedOrders.push({
