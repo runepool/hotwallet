@@ -2,17 +2,17 @@ import { Entity, Column, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeor
 
 @Entity('settings')
 export class SettingsEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column({ nullable: true })
-  bitcoinPrivateKey: string;
+  bitcoinPrivateKey?: string;
 
-  @Column()
-  ordUrl: string;
+  @Column({ nullable: true })
+  ordUrl?: string;
 
-  @Column('simple-array')
-  nostrRelays: string[];
+  @Column({ nullable: true })
+  websocketUrl?: string;
 
   @UpdateDateColumn()
   updatedAt: Date;

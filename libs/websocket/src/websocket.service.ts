@@ -3,107 +3,115 @@ import * as WebSocket from 'ws';
 import { DatabaseSettingsService } from '@app/database/settings/settings.service';
 import { DM } from './constants';
 import { v4 as uuidv4 } from 'uuid';
+import { BitcoinWalletService } from '@app/wallet';
 
 @Injectable()
 export class WebSocketService implements OnModuleInit {
     private readonly logger = new Logger(WebSocketService.name);
-    private server: WebSocket.Server;
-    private clients: Map<string, WebSocket> = new Map();
     private messageCallbacks: Map<string, (message: any) => void> = new Map();
+    private wsConnection: WebSocket;
+    private serverUrl: string;
+    private reconnectAttempts = 0;
+    private reconnectTimeout: NodeJS.Timeout;
 
-    private readonly serverPort = process.env.WS_PORT ? parseInt(process.env.WS_PORT) : 8080;
-    private readonly serverUrl = process.env.WS_URL || 'ws://localhost:8080';
-
-    // Client ID will be generated using UUID
+    // Client ID 
     public clientId: string;
 
-    constructor(private readonly settingsService: DatabaseSettingsService) {
-        // Generate a client ID using UUID
-        this.clientId = uuidv4();
-        this.logger.log(`Generated client ID: ${this.clientId}`);
+    constructor(
+        private readonly walletService: BitcoinWalletService,
+        private readonly settingsService: DatabaseSettingsService) {
     }
 
     async onModuleInit() {
-        // Initialize WebSocket server
-        this.server = new WebSocket.Server({ port: this.serverPort });
+        // Get WebSocket URL from settings
+        try {
+            const settings = await this.settingsService.getSettings();
+            this.serverUrl = settings.websocketUrl || 'wss://ws.runepool.io';
+            this.logger.log(`Using WebSocket server URL: ${this.serverUrl}`);
+            this.clientId = await this.walletService.getPublicKey();
 
-        this.server.on('connection', (ws: WebSocket) => {
-            this.logger.log('Client connected');
-
-            ws.on('message', (message: string) => {
-                try {
-                    const parsedMessage = JSON.parse(message.toString());
-
-                    // If this is a registration message, store the client's ID
-                    if (parsedMessage.type === 'register') {
-                        const clientId = parsedMessage.clientId;
-                        this.clients.set(clientId, ws);
-                        this.logger.log(`Client registered with ID: ${clientId}`);
-
-                        // Send confirmation
-                        ws.send(JSON.stringify({
-                            type: 'register_confirm',
-                            clientId: this.clientId
-                        }));
-                    }
-                    // Handle regular messages
-                    else if (parsedMessage.type === 'message') {
-                        // Process the message based on its type
-                        this.handleIncomingMessage(parsedMessage.content, parsedMessage.sender);
-                    }
-                } catch (error) {
-                    this.logger.error(`Error processing message: ${error.message}`);
-                }
-            });
-
-            ws.on('close', () => {
-                // Remove client from the map when they disconnect
-                for (const [key, client] of this.clients.entries()) {
-                    if (client === ws) {
-                        this.clients.delete(key);
-                        this.logger.log(`Client with ID ${key} disconnected`);
-                        break;
-                    }
-                }
-            });
-        });
-
-        this.logger.log(`WebSocket server started on port ${this.serverPort}`);
+            // Try to connect to the WebSocket server
+            try {
+                await this.connectToServer();
+                this.logger.log('Successfully connected to WebSocket server');
+            } catch (error) {
+                this.logger.error(`Failed to connect to WebSocket server: ${error.message}`);
+                this.scheduleReconnect();
+            }
+        } catch (error) {
+            this.logger.error(`Failed to get WebSocket URL from settings: ${error.message}`);
+            this.serverUrl = process.env.WS_URL || 'wss://ws.runepool.io';
+            this.scheduleReconnect();
+        }
     }
 
     // Connect to a WebSocket server
-    async connectToServer(serverUrl: string): Promise<WebSocket> {
+    async connectToServer(): Promise<void> {
         return new Promise((resolve, reject) => {
-            const ws = new WebSocket(serverUrl);
+            try {
+                this.wsConnection = new WebSocket(this.serverUrl);
 
-            ws.on('open', () => {
-                // Register with the server
-                ws.send(JSON.stringify({
-                    type: 'register',
-                    clientId: this.clientId
-                }));
+                this.wsConnection.on('open', () => {
+                    this.reconnectAttempts = 0;
+                    // Register with the server
+                    this.wsConnection.send(JSON.stringify({
+                        type: 'register',
+                        clientId: this.clientId
+                    }));
+                    this.logger.log(`Connected to WebSocket server at ${this.serverUrl}`);
+                    resolve();
+                });
 
-                resolve(ws);
-            });
+                this.wsConnection.on('message', (message: string) => {
+                    try {
+                        const parsedMessage = JSON.parse(message.toString());
+                        this.logger.debug(`Received message: ${JSON.stringify(parsedMessage)}`);
 
-            ws.on('message', (message: string) => {
-                try {
-                    const parsedMessage = JSON.parse(message.toString());
-
-                    // Handle messages
-                    if (parsedMessage.type === 'message') {
-                        this.handleIncomingMessage(parsedMessage.content, parsedMessage.sender);
+                        // Handle messages
+                        if (parsedMessage.type === 'message') {
+                            this.handleIncomingMessage(parsedMessage.content, parsedMessage.sender);
+                        } else if (parsedMessage.type === 'register_confirm') {
+                            this.logger.log(`Registration confirmed with server, client ID: ${parsedMessage.clientId}`);
+                        }
+                    } catch (error) {
+                        this.logger.error(`Error processing message: ${error.message}`);
                     }
-                } catch (error) {
-                    this.logger.error(`Error processing message: ${error.message}`);
-                }
-            });
+                });
 
-            ws.on('error', (error) => {
-                this.logger.error(`WebSocket connection error: ${error.message}`);
+                this.wsConnection.on('error', (error) => {
+                    this.logger.error(`WebSocket connection error: ${error.message}`);
+                    reject(error);
+                });
+
+                this.wsConnection.on('close', () => {
+                    this.logger.warn('WebSocket connection closed');
+                    this.scheduleReconnect();
+                });
+            } catch (error) {
+                this.logger.error(`Failed to create WebSocket connection: ${error.message}`);
                 reject(error);
-            });
+            }
         });
+    }
+
+    private scheduleReconnect(): void {
+        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+        this.reconnectAttempts++;
+
+        this.logger.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
+
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+        }
+
+        this.reconnectTimeout = setTimeout(async () => {
+            try {
+                await this.connectToServer();
+            } catch (error) {
+                this.logger.error(`Reconnect attempt failed: ${error.message}`);
+                this.scheduleReconnect();
+            }
+        }, delay);
     }
 
     private handleIncomingMessage(message: any, sender: string) {
@@ -167,33 +175,26 @@ export class WebSocketService implements OnModuleInit {
 
     // Send a direct message to another client
     async publishDirectMessage(content: string, receiverId: string): Promise<void> {
-        // Check if the client is connected to our server
-        const client = this.clients.get(receiverId);
-
-        if (client && client.readyState === WebSocket.OPEN) {
-            // Send directly to the connected client
-            client.send(JSON.stringify({
-                type: 'message',
-                sender: this.clientId,
-                content: content
-            }));
-        } else {
-            // If not connected to our server, try to connect to their server
-            // This assumes the receiver has a server running at a known URL
+        if (!this.wsConnection || this.wsConnection.readyState !== WebSocket.OPEN) {
             try {
-                const serverUrl = this.serverUrl;
-                const ws = await this.connectToServer(serverUrl);
-
-                ws.send(JSON.stringify({
-                    type: 'message',
-                    sender: this.clientId,
-                    receiver: receiverId,
-                    content: content
-                }));
+                await this.connectToServer();
             } catch (error) {
-                this.logger.error(`Failed to send message to ${receiverId}: ${error.message}`);
+                this.logger.error(`Failed to connect to server before sending message: ${error.message}`);
                 throw error;
             }
+        }
+
+        try {
+            this.wsConnection.send(JSON.stringify({
+                type: 'message',
+                sender: this.clientId,
+                receiver: receiverId,
+                content: content
+            }));
+            this.logger.debug(`Sent message to ${receiverId}`);
+        } catch (error) {
+            this.logger.error(`Failed to send message to ${receiverId}: ${error.message}`);
+            throw error;
         }
     }
 }

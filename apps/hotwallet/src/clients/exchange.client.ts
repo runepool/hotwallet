@@ -95,6 +95,7 @@ export class ExchangeClient implements OnModuleInit {
     } catch (error) {
       // Silently handle ping errors to avoid disrupting normal operation
       console.error('Failed to ping exchange server:', error.message);
+      throw error;
     }
   }
 

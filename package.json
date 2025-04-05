@@ -124,7 +124,6 @@
       "^@app/wallet(|/.*)$": "<rootDir>/libs/wallet/src/$1",
       "^@app/engine(|/.*)$": "<rootDir>/libs/engine/src/$1",
       "^@app/blockchain(|/.*)$": "<rootDir>/libs/blockchain/src/$1",
-      "^@app/nostr(|/.*)$": "<rootDir>/libs/nostr/src/$1",
       "^@app/exchange-database(|/.*)$": "<rootDir>/libs/exchange-database/src/$1",
       "^@app/execution(|/.*)$": "<rootDir>/libs/execution/src/$1"
     }

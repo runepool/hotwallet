@@ -3,16 +3,12 @@ import { UserSettings } from './settings.controller';
 import { DatabaseSettingsService } from '@app/database/settings/settings.service';
 import { BitcoinWalletService } from '@app/wallet';
 import { OrdClient } from '@app/blockchain/common/ord-client/client';
-import { WebSocketService } from '@app/websocket';
-import { ExchangeClient } from '../clients/exchange.client';
 
 @Injectable()
 export class SettingsService {
   constructor(
     private readonly walletService: BitcoinWalletService,
     private readonly ordClient: OrdClient,
-    private readonly webSocketService: WebSocketService,
-    private readonly exchangeClient: ExchangeClient,
     private readonly dbSettingsService: DatabaseSettingsService) { }
 
   async getSettings(): Promise<UserSettings> {
@@ -20,7 +16,7 @@ export class SettingsService {
     return {
       bitcoinPrivateKey: settings.bitcoinPrivateKey ? 'xxx' : '',
       ordUrl: settings.ordUrl,
-      nostrRelays: settings.nostrRelays,
+      websocketUrl: settings.websocketUrl || 'wss://ws.runepool.io',
     };
   }
 
@@ -28,7 +24,7 @@ export class SettingsService {
     await this.dbSettingsService.updateSettings({
       bitcoinPrivateKey: newSettings.bitcoinPrivateKey,
       ordUrl: newSettings.ordUrl,
-      nostrRelays: newSettings.nostrRelays,
+      websocketUrl: newSettings.websocketUrl,
     });
 
     // Reinitialize wallet if bitcoin private key changes

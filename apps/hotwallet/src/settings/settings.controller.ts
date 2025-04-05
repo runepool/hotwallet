@@ -6,7 +6,7 @@ import { SettingsService } from './settings.service';
 export class UserSettings {
   bitcoinPrivateKey: string;
   ordUrl: string;
-  nostrRelays: string[];
+  websocketUrl: string;
 }
 
 

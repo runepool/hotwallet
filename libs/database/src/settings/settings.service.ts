@@ -16,7 +16,7 @@ export class DatabaseSettingsService {
       // Return default settings if none exist
     return this.settingsRepository.save({
         ordUrl: 'https://ord.runepool.org',
-        nostrRelays: ['wss://relay.runepool.io', 'wss://nostr.zebedee.cloud'],
+        websocketUrl: 'wss://ws.runepool.io',
       });
     }
     return settings;
