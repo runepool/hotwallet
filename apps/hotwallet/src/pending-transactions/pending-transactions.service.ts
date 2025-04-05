@@ -76,6 +76,10 @@ export class PendingTransactionsService {
                             order = await this.orderService.getOrderById(id);
                             const oldAmount = order.filledQuantity;
                             order.filledQuantity -= BigInt(amount);
+                            if (order.filledQuantity < BigInt(0)) {
+                                Logger.warn(`Order ${id} filled quantity went below zero, setting to 0`);
+                                order.filledQuantity = BigInt(0);
+                            }
                             Logger.debug(`Resetting order ${id} filled quantity from ${oldAmount} to ${order.filledQuantity} (decrease by ${amount})`);
                             ordersToUpdate.push(order);
                         } else {
@@ -106,6 +110,23 @@ export class PendingTransactionsService {
                     const config = await this.autoRebalanceConfigService.get(transaction.rune);
                     if (config && config.enabled) {
                         Logger.debug(`Auto-rebalance is enabled for rune ${transaction.rune} with spread ${config.spread}%`);
+                        
+                        // Get existing open orders for this rune to check price boundaries
+                        const existingOrders = await this.orderService.getOrders(transaction.rune, 'OPEN');
+                        
+                        // Find lowest ask and highest bid
+                        let lowestAsk = Number.MAX_SAFE_INTEGER;
+                        let highestBid = 0;
+                        
+                        for (const existingOrder of existingOrders) {
+                            if (existingOrder.type === RuneOrderType.ASK && Number(existingOrder.price) < lowestAsk) {
+                                lowestAsk = Number(existingOrder.price);
+                            } else if (existingOrder.type === RuneOrderType.BID && Number(existingOrder.price) > highestBid) {
+                                highestBid = Number(existingOrder.price);
+                            }
+                        }
+                        
+                        Logger.debug(`Price boundaries for ${transaction.rune}: Lowest ASK = ${lowestAsk}, Highest BID = ${highestBid}`);
 
                         for (const order of transaction.orders.split(",")) {
                             const [id, amount, price] = order.split(":");
@@ -113,10 +134,26 @@ export class PendingTransactionsService {
                             let newPrice: number;
 
                             if (transaction.type === TransactionType.BUY) {
+                                // For BUY transactions, create new ASK orders
                                 newPrice = +price * (1 + spread / 100);
+                                
+                                // Ensure new ASK price is below lowest existing ASK (if there are any)
+                                if (lowestAsk !== Number.MAX_SAFE_INTEGER && newPrice >= lowestAsk) {
+                                    newPrice = lowestAsk - 1;
+                                    Logger.debug(`Adjusted ASK price to ${newPrice} to stay below lowest ask`);
+                                }
+                                
                                 Logger.debug(`Creating new ASK order with price ${newPrice} (original: ${price}, spread: +${spread}%)`);
                             } else {
+                                // For SELL transactions, create new BID orders
                                 newPrice = +price * (1 - spread / 100);
+                                
+                                // Ensure new BID price is above highest existing BID
+                                if (highestBid > 0 && newPrice <= highestBid) {
+                                    newPrice = highestBid + 1;
+                                    Logger.debug(`Adjusted BID price to ${newPrice} to stay above highest bid`);
+                                }
+                                
                                 Logger.debug(`Creating new BID order with price ${newPrice} (original: ${price}, spread: -${spread}%)`);
                             }
 
@@ -134,15 +171,45 @@ export class PendingTransactionsService {
                             }
                             
                             const newOrderType = transaction.type === TransactionType.SELL ? RuneOrderType.BID : RuneOrderType.ASK;
-                            Logger.debug(`Creating new ${newOrderType} order for rune ${transaction.rune} with quantity ${amount} and price ${Math.ceil(newPrice)}`);
+                            const finalPrice = BigInt(Math.ceil(newPrice));
                             
-                            newOrders.push({
-                                rune: transaction.rune,
-                                price: BigInt(Math.ceil(newPrice)),
-                                quantity: BigInt(amount),
-                                status: OrderStatus.OPEN,
-                                type: newOrderType
-                            } as any);
+                            // Check if there's already an order with the same price in our new orders batch
+                            const existingOrderIndex = newOrders.findIndex(o => 
+                                o.rune === transaction.rune && 
+                                o.type === newOrderType && 
+                                o.price === finalPrice
+                            );
+                            
+                            if (existingOrderIndex !== -1) {
+                                // Merge with existing order at the same price
+                                Logger.debug(`Merging with existing order at price ${finalPrice} for rune ${transaction.rune}`);
+                                newOrders[existingOrderIndex].quantity += BigInt(amount);
+                            } else {
+                                // Check if there's an existing order in the database with the same price
+                                const existingDbOrder = existingOrders.find(o => 
+                                    o.type === newOrderType && 
+                                    o.price === finalPrice && 
+                                    o.status === OrderStatus.OPEN
+                                );
+                                
+                                if (existingDbOrder) {
+                                    // Update existing order in the database
+                                    Logger.debug(`Updating existing order ${existingDbOrder.id} at price ${finalPrice} for rune ${transaction.rune}`);
+                                    existingDbOrder.quantity += BigInt(amount);
+                                    ordersToUpdate.push(existingDbOrder);
+                                } else {
+                                    // Create new order
+                                    Logger.debug(`Creating new ${newOrderType} order for rune ${transaction.rune} with quantity ${amount} and price ${finalPrice}`);
+                                    
+                                    newOrders.push({
+                                        rune: transaction.rune,
+                                        price: finalPrice,
+                                        quantity: BigInt(amount),
+                                        status: OrderStatus.OPEN,
+                                        type: newOrderType
+                                    } as any);
+                                }
+                            }
                         }
 
                     }

@@ -19,7 +19,9 @@ export class EventHandlerService {
     private reservedUtxos: {
         [utxo: string]: {
             tradeId: string,
-            timestamp: number
+            timestamp: number,
+            orderAmount: number,
+            usedAmount: number
         }
     } = {};
 
@@ -77,33 +79,32 @@ export class EventHandlerService {
         ));
     }
 
-    async handleReserveCancel(message: Message<{tradeId: string}>, event: any) {
+    async handleReserveCancel(tradeId: string) {
         try {
-            const { tradeId } = message.data;
             Logger.debug(`Received reserve cancel for trade ${tradeId}`);
-            
+
             // Find all UTXOs reserved for this trade ID
             const reservedUtxosForTrade = Object.entries(this.reservedUtxos)
                 .filter(([_, data]) => data.tradeId === tradeId)
                 .map(([utxo]) => utxo);
-            
+
             if (reservedUtxosForTrade.length === 0) {
                 Logger.debug(`No UTXOs found for trade ${tradeId}`);
                 return;
             }
-            
+
             // Release all reserved UTXOs for this trade
             Logger.debug(`Releasing ${reservedUtxosForTrade.length} UTXOs for trade ${tradeId}`);
             reservedUtxosForTrade.forEach(utxo => {
                 delete this.reservedUtxos[utxo];
             });
-            
+
             // Release the lock if it exists
             const lockId = `reserve-${tradeId}`;
             if (this.locks && this.locks[lockId]) {
                 delete this.locks[lockId];
             }
-            
+
             // Update transaction status and reset order filled quantities
             try {
                 const transaction = await this.manager.getRepository(Transaction).findOne({ where: { tradeId } });
@@ -113,7 +114,7 @@ export class EventHandlerService {
                         const [orderId, usedAmount] = entry.split(':');
                         return { orderId, usedAmount: BigInt(usedAmount) };
                     });
-                    
+
                     // Get all order objects
                     const ordersRepo = this.manager.getRepository(RuneOrder);
                     const orders = await Promise.all(
@@ -122,18 +123,22 @@ export class EventHandlerService {
                             if (order) {
                                 // Decrease the filled quantity by the amount that was reserved
                                 order.filledQuantity -= entry.usedAmount;
+                                if (order.filledQuantity < BigInt(0)) {
+                                    Logger.warn(`Order ${order.id} filled quantity went below zero, setting to 0`);
+                                    order.filledQuantity = BigInt(0);
+                                }
                                 Logger.debug(`Decreased filled quantity for order ${order.id} by ${entry.usedAmount}`);
                             }
                             return order;
                         })
                     );
-                    
+
                     // Filter out any null orders
                     const validOrders = orders.filter(order => order !== null);
-                    
+
                     // Update transaction status and save orders
                     transaction.status = TransactionStatus.ERRORED;
-                    
+
                     await this.manager.transaction(async manager => {
                         // Save all orders with updated filled quantities
                         if (validOrders.length > 0) {
@@ -141,13 +146,13 @@ export class EventHandlerService {
                         }
                         await manager.save(transaction);
                     });
-                    
+
                     Logger.debug(`Updated transaction status to ERRORED and reset filled quantities for trade ${tradeId}`);
                 }
             } catch (error) {
                 Logger.error(`Error updating transaction status and order quantities: ${error.message}`);
             }
-            
+
             Logger.debug(`Successfully cancelled reservation for trade ${tradeId}`);
         } catch (error) {
             Logger.error(`Error handling reserve cancel: ${error.message}`);
@@ -201,98 +206,114 @@ export class EventHandlerService {
     }
 
     async reserveOrders(fillOrderRequest: ReserveOrdersRequest) {
-        const selectedOrders = [];
+        try {
 
-        const ordersRepo = this.manager.getRepository(RuneOrder);
-        for (const orderFill of fillOrderRequest.orders) {
-            const order = await ordersRepo.findOne({ where: { id: orderFill.orderId } });
-            if (!order) {
-                throw new Error(`Order ${orderFill.orderId} not found`);
+
+            const selectedOrders = [];
+
+            const ordersRepo = this.manager.getRepository(RuneOrder);
+            for (const orderFill of fillOrderRequest.orders) {
+                const order = await ordersRepo.findOne({ where: { id: orderFill.orderId } });
+                if (!order) {
+                    throw new Error(`Order ${orderFill.orderId} not found`);
+                }
+                if (order.filledQuantity + BigInt(orderFill.amount) > order.quantity) {
+                    throw new Error(`Order ${orderFill.orderId} quantity exceeded`);
+                }
+
+                order.filledQuantity += BigInt(orderFill.amount);
+                Logger.debug(`Order ${orderFill.orderId} filled quantity: ${order.filledQuantity}`);
+                selectedOrders.push({
+                    order,
+                    usedAmount: BigInt(orderFill.amount),
+                    price: Number(order.price)
+                });
             }
-            if (order.filledQuantity + BigInt(orderFill.amount) > order.quantity) {
-                throw new Error(`Order ${orderFill.orderId} quantity exceeded`);
+
+            const orderType = selectedOrders[0].order.type;
+
+            let reservedUtxos: string[];
+            if (orderType === 'ask') {
+                reservedUtxos = await this.reserverAskUTXOs(fillOrderRequest.tradeId, selectedOrders);
+            } else if (orderType === 'bid') {
+                reservedUtxos = await this.reserveBidUTXOs(fillOrderRequest.tradeId, selectedOrders);
             }
-            
-            order.filledQuantity += BigInt(orderFill.amount);
-            Logger.debug(`Order ${orderFill.orderId} filled quantity: ${order.filledQuantity}`);
-            selectedOrders.push({
-                order,
-                usedAmount: BigInt(orderFill.amount),
-                price: Number(order.price)
+
+            const runeAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount, 0n).toString();
+            let satsAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount * BigInt(curr.order.price), 0n);
+            const runeInfo = await this.runeService.getRuneInfo(selectedOrders[0].order.rune);
+
+            satsAmount = satsAmount / BigInt(10 ** runeInfo.decimals);
+
+            // Check if a transaction with this tradeId already exists
+            const existingTransaction = await this.manager.getRepository(Transaction).findOne({
+                where: { tradeId: fillOrderRequest.tradeId }
             });
-        }
 
-        const orderType = selectedOrders[0].order.type;
+            const avgPrice = selectedOrders.reduce((prev, curr) => prev += Number(curr.order.price), 0) / selectedOrders.length;
 
-        let reservedUtxos: string[];
-        if (orderType === 'ask') {
-            reservedUtxos = await this.reserverAskUTXOs(fillOrderRequest.tradeId, selectedOrders);
-        } else if (orderType === 'bid') {
-            reservedUtxos = await this.reserveBidUTXOs(fillOrderRequest.tradeId, selectedOrders);
-        }
+            if (existingTransaction) {
+                Logger.log(`Transaction for trade ID ${fillOrderRequest.tradeId} already exists, updating with new order details`);
 
-        const runeAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount, 0n).toString();
-        let satsAmount = selectedOrders.reduce((prev, curr) => prev += curr.usedAmount * BigInt(curr.order.price), 0n);
-        const runeInfo = await this.runeService.getRuneInfo(selectedOrders[0].order.rune);
+                // Update the existing transaction with new order details
+                const newOrdersString = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.price}`).join(",");
 
-        satsAmount = satsAmount / BigInt(10 ** runeInfo.decimals);
+                existingTransaction.orders = existingTransaction.orders + "," + newOrdersString;
+                existingTransaction.amount = (BigInt(existingTransaction.amount) + BigInt(runeAmount)).toString();
+                existingTransaction.satsAmount = (BigInt(existingTransaction.satsAmount) + BigInt(satsAmount)).toString();
+                existingTransaction.price = (Number(+(existingTransaction.price) + avgPrice) / 2).toString();
+                // Keep the existing reservedUtxos
+                existingTransaction.reservedUtxos = [...new Set([...existingTransaction.reservedUtxos.split(";"), ...reservedUtxos])].join(";");
 
-        // Check if a transaction with this tradeId already exists
-        const existingTransaction = await this.manager.getRepository(Transaction).findOne({
-            where: { tradeId: fillOrderRequest.tradeId }
-        });
+                // Save the updated transaction and orders
+                await this.manager.transaction(async manager => {
+                    await manager.save<RuneOrder>(selectedOrders.map(item => item.order));
+                    await manager.save(existingTransaction);
+                });
 
-        const avgPrice = selectedOrders.reduce((prev, curr) => prev += Number(curr.order.price), 0) / selectedOrders.length;
+                return reservedUtxos;
+            }
 
-        if (existingTransaction) {
-            Logger.log(`Transaction for trade ID ${fillOrderRequest.tradeId} already exists, updating with new order details`);
-
-            // Update the existing transaction with new order details
-            const newOrdersString = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.price}`).join(",");
-
-            existingTransaction.orders = existingTransaction.orders + "," + newOrdersString;
-            existingTransaction.amount = (BigInt(existingTransaction.amount) + BigInt(runeAmount)).toString();
-            existingTransaction.satsAmount = (BigInt(existingTransaction.satsAmount) + BigInt(satsAmount)).toString();
-            existingTransaction.price = (Number(+(existingTransaction.price) + avgPrice) / 2).toString();
-            // Keep the existing reservedUtxos
-            const existingUtxos = existingTransaction.reservedUtxos.split(';');
-
-            // Save the updated transaction and orders
-            await this.manager.transaction(async manager => {
+            const pendingTx = new Transaction();
+            pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.price}`).join(",");
+            pendingTx.amount = runeAmount;
+            pendingTx.satsAmount = satsAmount.toString();
+            pendingTx.tradeId = fillOrderRequest.tradeId;
+            pendingTx.price = avgPrice.toString();
+            pendingTx.confirmations = 0;
+            pendingTx.rune = selectedOrders[0].order.rune;
+            pendingTx.status = TransactionStatus.PENDING;
+            pendingTx.type = selectedOrders[0].order.type === 'bid' ? TransactionType.BUY : TransactionType.SELL;
+            pendingTx.reservedUtxos = reservedUtxos.join(";");
+            const result = await this.manager.transaction(async manager => {
                 await manager.save<RuneOrder>(selectedOrders.map(item => item.order));
-                await manager.save(existingTransaction);
+                await manager.save(pendingTx);
+
+                return reservedUtxos
             });
 
-            return reservedUtxos;
+            return result;
+        } catch (error) {
+            this.handleReserveCancel(fillOrderRequest.tradeId);
+            throw error;
         }
-
-        const pendingTx = new Transaction();
-        pendingTx.orders = selectedOrders.map(item => `${item.order.id}:${item.usedAmount}:${item.price}`).join(",");
-        pendingTx.amount = runeAmount;
-        pendingTx.satsAmount = satsAmount.toString();
-        pendingTx.tradeId = fillOrderRequest.tradeId;
-        pendingTx.price = avgPrice.toString();
-        pendingTx.confirmations = 0;
-        pendingTx.rune = selectedOrders[0].order.rune;
-        pendingTx.status = TransactionStatus.PENDING;
-        pendingTx.type = selectedOrders[0].order.type === 'bid' ? TransactionType.BUY : TransactionType.SELL;
-        pendingTx.reservedUtxos = reservedUtxos.join(";");
-        const result = await this.manager.transaction(async manager => {
-            await manager.save<RuneOrder>(selectedOrders.map(item => item.order));
-            await manager.save(pendingTx);
-
-            return reservedUtxos
-        });
-
-        return result;
     }
 
     async reserveBidUTXOs(tradeId: string, selectedOrders: { order: RuneOrder; usedAmount: bigint }[]): Promise<string[]> {
         const result = [];
         const runeInfo = await this.runeService.getRuneInfo(selectedOrders[0].order.rune);
-
         let totalAmount = selectedOrders.reduce((prev, curr) => prev += (curr.usedAmount * curr.order.price), 0n);
         totalAmount = totalAmount / BigInt(10 ** runeInfo.decimals);
+
+        // Check if we have enough runes allocated allready and if yes return the existing utxos
+        const previouslyAllocatedRuneAmount = Object.values(this.reservedUtxos).filter(item => item.tradeId === tradeId).reduce((prev, curr) => prev + BigInt(curr.usedAmount), 0n);
+        const amountRequiredSoFar = Object.values(this.reservedUtxos).find(item => item.tradeId === tradeId)?.orderAmount || 0;
+        const residualAmount = Number(previouslyAllocatedRuneAmount) - amountRequiredSoFar;
+
+        if (residualAmount >= totalAmount) {
+            return Object.entries(this.reservedUtxos).filter(([_, item]) => item.tradeId === tradeId).map(([key]) => key);
+        }
+
         const address = await this.walletService.getAddress();
         const pubkey = await this.walletService.getPublicKey();
         let utxos = await this.bitcoinService.getValidFundingInputs(address, pubkey);
@@ -309,7 +330,7 @@ export class EventHandlerService {
                 throw new Error('No more UTXOs available');
             }
             totalAmount -= BigInt(utxo.amount);
-            this.reservedUtxos[utxo.location] = { tradeId, timestamp: Date.now() };
+            this.reservedUtxos[utxo.location] = { tradeId, timestamp: Date.now(), orderAmount: Number(totalAmount), usedAmount: utxo.amount };
             result.push(utxo.location);
         }
         return result;
@@ -346,7 +367,7 @@ export class EventHandlerService {
                 throw new Error('Rune not found in UTXO');
             }
             totalAmount -= utxo.runeBalances[runeIdIndex];
-            this.reservedUtxos[utxo.location] = { tradeId, timestamp: Date.now() };
+            this.reservedUtxos[utxo.location] = { tradeId, timestamp: Date.now(), orderAmount: Number(totalAmount), usedAmount: Number(utxo.runeBalances[runeIdIndex]) };
             result.push(utxo.location);
         }
 

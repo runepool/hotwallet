@@ -31,7 +31,7 @@ export class ExecutionService implements OnModuleInit {
                 }
 
                 if (message.type === 'reserve_cancel') {
-                    await this.eventHandlerService.handleReserveCancel(message, event);
+                    await this.eventHandlerService.handleReserveCancel(message.data.tradeId);
                     return;
                 }
 

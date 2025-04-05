@@ -27,7 +27,41 @@ export class RuneOrdersService {
 
 
   async createOrder(orderData: CreateRuneOrderDto): Promise<RuneOrder> {
+    // Check if there's an existing order at the same price
+    const existingOrders = await this.dbService.getOrders(orderData.rune, OrderStatus.OPEN);
+    const existingOrder = existingOrders.find(o => 
+      o.type === orderData.type && 
+      o.price === BigInt(orderData.price)
+    );
 
+    if (existingOrder) {
+      // Merge with existing order
+      this.logger.log(`Found existing order ${existingOrder.id} at price ${orderData.price} for ${orderData.rune}. Merging quantities.`);
+      
+      // Update the existing order with the new quantity
+      const updatedQuantity = existingOrder.quantity + BigInt(orderData.quantity);
+      const updatedOrder = await this.dbService.updateOrder(existingOrder.id, {
+        quantity: updatedQuantity
+      });
+
+      try {
+        // Update the order on the exchange
+        await this.exchangeClient.createRuneOrder({
+          id: existingOrder.id,
+          rune: existingOrder.rune,
+          quantity: updatedQuantity,
+          price: existingOrder.price,
+          type: existingOrder.type as any
+        });
+        this.logger.log(`Order ${existingOrder.id} updated on exchange successfully with new quantity ${updatedQuantity}`);
+      } catch (error) {
+        this.logger.error(`Failed to update order ${existingOrder.id} on exchange: ${error.message}`);
+      }
+
+      return updatedOrder;
+    }
+    
+    // No existing order at this price, create a new one
     const order = {
       rune: orderData.rune,
       price: BigInt(orderData.price),
@@ -52,7 +86,6 @@ export class RuneOrdersService {
     } catch (error) {
       console.log(error)
       this.logger.error(`Failed to mirror order ${localOrder.id} to exchange: ${error.message}`);
-
     }
 
     return localOrder;
