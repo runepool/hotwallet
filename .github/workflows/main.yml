@@ -2,8 +2,8 @@ name: Build & Bundle YourApp
 
 on:
   push:
-    branches: [main]
-
+    tags:
+      - 'v*'
 jobs:
   build:
     strategy:
