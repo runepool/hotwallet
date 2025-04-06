@@ -51,6 +51,11 @@ jobs:
         run: |
           SQLITE_BINDING=$(find node_modules/better-sqlite3 -name "*.node" | head -n 1)
           cp "$SQLITE_BINDING" bundle/better_sqlite3.node
+          
+      - name: Copy argon2 native binding
+  run: |
+    ARGON_BINDING=$(find node_modules/argon2 -name '*.node' | head -n 1)
+    cp "$ARGON_BINDING" bundle/argon2.node
 
       - name: Copy frontend build
         run: |
