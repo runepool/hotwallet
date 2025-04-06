@@ -63,7 +63,7 @@ jobs:
           curl -fsSL "https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-${OS}-${ARCH}.tar.xz" | tar -xJ
           cp "node-${NODE_VER}-${OS}-${ARCH}/bin/node" bundle/node
           chmod +x bundle/node
-          
+
       - name: Package bundle
         run: |
           TAG=${{ github.ref_name }}
@@ -82,3 +82,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: ${{ env.FILENAME }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
