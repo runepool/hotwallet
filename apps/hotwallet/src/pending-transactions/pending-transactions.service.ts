@@ -4,11 +4,10 @@ import { TransactionsDbService } from '@app/database/transactions/transactions.s
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { RuneOrder, RuneOrderType } from '@app/database/entities/rune-order.entity';
+import { OrderStatus, RuneOrder, RuneOrderType } from '@app/database/entities/rune-order.entity';
 import { RuneOrdersService } from '@app/database/rune-orders/rune-orders-database.service';
 import { TransactionStatus, TransactionType } from '@app/database/entities/transaction.entity';
 import { AutoRebalanceConfigService } from '@app/database/auto-rebalance/auto-rebalance.service';
-import { OrderStatus } from '../../../../../rune-pool-exchange/libs/exchange-database/src/entities/rune-order.entity';
 
 @Injectable()
 export class PendingTransactionsService {
