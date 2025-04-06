@@ -5,7 +5,7 @@ set -euo pipefail
 
 # Defaults
 ENV="production"
-FRONTEND_PORT=4000
+FRONTEND_PORT=4123
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="$APP_DIR/runepool.log"
 
@@ -57,7 +57,7 @@ echo "📁  App Directory  : $APP_DIR"
 echo ""
 
 # Paths
-MAIN_JS="$APP_DIR/main.js"
+MAIN_JS="$APP_DIR/index.js"
 NODE_BIN="$APP_DIR/node"
 NODE_CMD="${NODE_BIN:-$(command -v node)}"
 
@@ -86,7 +86,7 @@ fi
 # Start unified app and log output
 echo "📄 Logging to: $LOG_FILE"
 echo "🕒 Started at: $(date)"
- Start server and open browser
+
 {
   "$NODE_CMD" "$MAIN_JS" 2>&1 | tee -a "$LOG_FILE"
 } &
