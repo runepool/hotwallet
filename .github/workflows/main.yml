@@ -1,0 +1,74 @@
+name: Build & Bundle YourApp
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node_version: [20.9.0]
+    runs-on: ${{ matrix.os }}
+    name: Build on ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node_version }}
+
+      - name: Install backend dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build NestJS backend
+        run: yarn build
+
+      - name: Build frontend (Vite)
+        working-directory: webapp
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
+
+      - name: Bundle NestJS backend with ncc
+        run: |
+          yarn add -D @vercel/ncc
+          npx ncc build dist/apps/hotwallet/main.js -o bundle
+
+      - name: Copy SQLite native binding
+        run: |
+          SQLITE_BINDING=$(find node_modules/better-sqlite3 -name "*.node" | head -n 1)
+          cp "$SQLITE_BINDING" bundle/better_sqlite3.node
+
+      - name: Copy frontend build
+        run: |
+          mkdir -p bundle/webapp
+          cp -r webapp/dist bundle/webapp/
+
+      - name: Copy start.sh
+        run: cp start.sh bundle/start.sh && chmod +x bundle/start.sh
+
+      - name: Download Node.js binary
+        run: |
+          NODE_VER="v${{ matrix.node_version }}"
+          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')
+          curl -fsSL "https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-${OS}-${ARCH}.tar.xz" | tar -xJ
+          cp "node-${NODE_VER}-${OS}-${ARCH}/bin/node" bundle/node
+          chmod +x bundle/node
+
+      - name: Package bundle
+        run: |
+          TAR_NAME="yourapp-${{ matrix.os }}.tar.gz"
+          tar -czf "$TAR_NAME" -C bundle .
+          mv "$TAR_NAME" yourapp.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yourapp-${{ matrix.os }}
+          path: yourapp.tar.gz
