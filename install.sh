@@ -24,9 +24,9 @@ TARBALL="$APP_NAME-${OS}.tar.gz"
 
 # GitHub release URL (using HTTPS)
 if [[ "$VERSION" == "latest" ]]; then
-  BASE_URL="https://github.com/runepool/hotwallet/releases/latest/download"
+  BASE_URL="https://github.com/runepool/hotwallet-install/releases/latest/download"
 else
-  BASE_URL="https://github.com/runepool/hotwallet/releases/download/$VERSION"
+  BASE_URL="https://github.com/runepool/hotwallet-install/releases/download/$VERSION"
 fi
 
 DOWNLOAD_URL="$BASE_URL/$TARBALL"
