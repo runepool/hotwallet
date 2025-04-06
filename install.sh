@@ -22,7 +22,7 @@ OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')
 TARBALL="$APP_NAME-${OS}.tar.gz"
 
-# GitHub release URL (using HTTPS)
+# GitHub release URL
 if [[ "$VERSION" == "latest" ]]; then
   BASE_URL="https://github.com/runepool/hotwallet-install/releases/latest/download"
 else
@@ -32,7 +32,17 @@ fi
 DOWNLOAD_URL="$BASE_URL/$TARBALL"
 
 echo "⬇️  Downloading $TARBALL from $DOWNLOAD_URL..."
-curl -fsSL "$DOWNLOAD_URL" -o "$TARBALL"
+curl -fL "$DOWNLOAD_URL" -o "$TARBALL"
+
+# 🔓 Unprotect old version if exists
+if [[ -d "$INSTALL_DIR" ]]; then
+  echo "🔓 Removing immutable flags..."
+  if [[ "$OS" == "linux" && -x "$(command -v chattr)" ]]; then
+    sudo chattr -i "$INSTALL_DIR"/* || true
+  elif [[ "$OS" == "darwin" ]]; then
+    sudo chflags nouchg "$INSTALL_DIR"/* || true
+  fi
+fi
 
 echo "📦 Extracting to $INSTALL_DIR..."
 sudo mkdir -p "$INSTALL_DIR"
@@ -50,7 +60,8 @@ sudo chmod 500 "$INSTALL_DIR/index.js" "$INSTALL_DIR/start.sh"
 sudo chmod +x "$INSTALL_DIR/start.sh"
 [[ -f "$INSTALL_DIR/node" ]] && sudo chmod 500 "$INSTALL_DIR/node"
 
-# Make immutable
+# 🔐 Reapply immutability
+echo "🔐 Locking binaries..."
 if [[ "$OS" == "linux" && -x "$(command -v chattr)" ]]; then
   sudo chattr +i "$INSTALL_DIR/index.js" "$INSTALL_DIR/start.sh"
   [[ -f "$INSTALL_DIR/node" ]] && sudo chattr +i "$INSTALL_DIR/node"
@@ -65,5 +76,5 @@ echo "#!/bin/bash
 exec \"$INSTALL_DIR/start.sh\" \"\$@\"" | sudo tee "$BIN_LINK" > /dev/null
 sudo chmod +x "$BIN_LINK"
 
-echo "✅ Installed $APP_NAME"
+echo "✅ Installed $APP_NAME (version: $VERSION)"
 echo "➡️  Run with: $APP_NAME"
