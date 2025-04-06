@@ -1,5 +1,4 @@
 import { DatabaseSettingsService } from '@app/database/settings/settings.service';
-import { RuneOrder } from '@app/exchange-database/entities/rune-order.entity';
 import { HttpService } from '@nestjs/axios';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { secp256k1 } from "@noble/curves/secp256k1";
@@ -7,6 +6,7 @@ import { createHash } from 'crypto';
 import { lastValueFrom } from 'rxjs';
 import { BatchCreateRuneOrderDto, BatchDeleteRuneOrderDto, CreateRuneOrderDto, UpdateRuneOrderDto } from './dto/rune-orders.dto';
 import { CreateTradeDto } from './dto/trade.dto';
+import { RuneOrder } from '@app/database/entities/rune-order.entity';
 
 @Injectable()
 export class ExchangeClient implements OnModuleInit {
