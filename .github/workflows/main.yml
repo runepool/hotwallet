@@ -4,8 +4,13 @@ on:
   push:
     tags:
       - 'v*'
+
+permissions:
+  contents: write
+
 jobs:
   build:
+    permissions: write-all
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
