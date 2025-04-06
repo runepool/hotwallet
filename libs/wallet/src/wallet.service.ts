@@ -9,7 +9,6 @@ import { DatabaseSettingsService } from '@app/database/settings/settings.service
 import { EncryptionService } from './encryption.service';
 import { combine, split } from 'shamir-secret-sharing';
 import { randomBytes } from 'crypto';
-import { UInt8 } from 'bitcoinjs-lib/src/types';
 
 dotenv.config();
 
