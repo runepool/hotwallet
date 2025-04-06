@@ -66,9 +66,9 @@ jobs:
 
       - name: Package bundle
         run: |
-          TAR_NAME="yourapp-${{ matrix.os }}.tar.gz"
+          TAR_NAME="runepool-hotwallet-${{ matrix.os }}.tar.gz"
           tar -czf "$TAR_NAME" -C bundle .
-          mv "$TAR_NAME" yourapp.tar.gz
+          mv "$TAR_NAME" runepool-hotwallet.tar.gz
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
