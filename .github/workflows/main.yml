@@ -72,14 +72,14 @@ jobs:
       - name: Package bundle
         run: |
           TAG=${{ github.ref_name }}
-          FILENAME="runepool-hotwallet-${TAG}-${{ matrix.os }}.tar.gz"
+          FILENAME="runepool-hotwallet-${{ matrix.os }}.tar.gz"
           tar -czf "$FILENAME" -C bundle .
           echo "FILENAME=$FILENAME" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: runepool-hotwallet-${{ github.ref_name }}-${{ matrix.os }}
+          name: runepool-hotwallet-${{ matrix.os }}
           path: ${{ env.FILENAME }}
 
       - name: Upload artifact to GitHub Release

@@ -20,7 +20,7 @@ done
 # Detect OS/ARCH
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')
-TARBALL="$APP_NAME-${VERSION}-${OS}.tar.gz"
+TARBALL="$APP_NAME-${OS}.tar.gz"
 
 # GitHub release URL (using HTTPS)
 if [[ "$VERSION" == "latest" ]]; then
