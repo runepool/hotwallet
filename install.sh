@@ -1,148 +1,69 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Install script for Runepool DEX
-# This script pulls the latest code and builds the application
+APP_NAME="runepool-hotwallet"
+INSTALL_DIR="/opt/$APP_NAME"
+BIN_LINK="/usr/local/bin/$APP_NAME"
+VERSION="latest"
 
-# Default values
-BRANCH="main"
-REPO_URL="https://github.com/runepool/hotwallet.git"
-WEBAPP_REPO_URL="https://github.com/runepool/hotwallet-ui.git"
-INSTALL_DIR="$HOME/runepool-dex"
-
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    -b|--branch)
-      BRANCH="$2"
-      shift 2
-      ;;
-    -d|--directory)
-      INSTALL_DIR="$2"
-      shift 2
-      ;;
-    -h|--help)
-      echo "Usage: ./install.sh [options]"
-      echo "Options:"
-      echo "  -b, --branch BRANCH    Git branch to use (default: main)"
-      echo "  -d, --directory DIR    Installation directory (default: ~/runepool-dex)"
-      echo "  -h, --help             Show this help message"
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1"
-      exit 1
+# Parse CLI args
+for ((i=1; i<=$#; i++)); do
+  arg="${!i}"
+  case "$arg" in
+    --version)
+      next=$((i+1))
+      VERSION="${!next:-latest}"
       ;;
   esac
 done
 
-echo "🚀 Starting installation with the following configuration:"
-echo "- Git Branch: $BRANCH"
-echo "- Installation Directory: $INSTALL_DIR"
-echo ""
+# Detect OS/ARCH
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')
+TARBALL="$APP_NAME-${VERSION}-${OS}.tar.gz"
 
-# Create installation directory if it doesn't exist
-if [ ! -d "$INSTALL_DIR" ]; then
-  echo "📁 Creating installation directory: $INSTALL_DIR"
-  mkdir -p "$INSTALL_DIR"
-  
-  # Clone the repository
-  echo "📥 Cloning backend repository from $REPO_URL"
-  git clone "$REPO_URL" "$INSTALL_DIR"
-  if [ $? -ne 0 ]; then
-    echo "❌ Failed to clone backend repository"
-    exit 1
-  fi
-  
-  cd "$INSTALL_DIR"
+# GitHub release URL (using HTTPS)
+if [[ "$VERSION" == "latest" ]]; then
+  BASE_URL="https://github.com/runepool/hotwallet/releases/latest/download"
 else
-  # Update existing repository
-  echo "📂 Using existing installation directory: $INSTALL_DIR"
-  cd "$INSTALL_DIR"
-  
-  echo "📥 Pulling latest backend changes"
-  git fetch
-  git checkout "$BRANCH"
-  git pull
-  if [ $? -ne 0 ]; then
-    echo "❌ Failed to pull latest backend changes"
-    exit 1
-  fi
+  BASE_URL="https://github.com/runepool/hotwallet/releases/download/$VERSION"
 fi
 
-# Check if webapp directory exists and if it's a git repository
-if [ -d "$INSTALL_DIR/webapp" ]; then
-  if [ -d "$INSTALL_DIR/webapp/.git" ]; then
-    # It's a git repository, update it
-    echo "📥 Pulling latest webapp changes"
-    cd "$INSTALL_DIR/webapp"
-    git fetch
-    git checkout "$BRANCH" || git checkout main
-    git pull
-    if [ $? -ne 0 ]; then
-      echo "❌ Failed to pull latest webapp changes"
-      exit 1
-    fi
-  else
-    # It exists but is not a git repository, remove and clone
-    echo "🔄 Webapp directory exists but is not a git repository. Recreating..."
-    rm -rf "$INSTALL_DIR/webapp"
-    echo "📥 Cloning webapp repository from $WEBAPP_REPO_URL"
-    git clone "$WEBAPP_REPO_URL" "$INSTALL_DIR/webapp"
-    if [ $? -ne 0 ]; then
-      echo "❌ Failed to clone webapp repository"
-      exit 1
-    fi
-  fi
-else
-  # Webapp directory doesn't exist, clone it
-  echo "📥 Cloning webapp repository from $WEBAPP_REPO_URL"
-  git clone "$WEBAPP_REPO_URL" "$INSTALL_DIR/webapp"
-  if [ $? -ne 0 ]; then
-    echo "❌ Failed to clone webapp repository"
-    exit 1
-  fi
+DOWNLOAD_URL="$BASE_URL/$TARBALL"
+
+echo "⬇️  Downloading $TARBALL from $DOWNLOAD_URL..."
+curl -fsSL "$DOWNLOAD_URL" -o "$TARBALL"
+
+echo "📦 Extracting to $INSTALL_DIR..."
+sudo mkdir -p "$INSTALL_DIR"
+sudo tar -xzf "$TARBALL" -C "$INSTALL_DIR"
+rm "$TARBALL"
+
+# macOS: remove quarantine flag
+if [[ "$OS" == "darwin" ]]; then
+  echo "🛡️  Removing macOS quarantine flags..."
+  sudo xattr -dr com.apple.quarantine "$INSTALL_DIR" || true
 fi
 
-# Install backend dependencies
-echo "📦 Installing backend dependencies"
-cd "$INSTALL_DIR"
-yarn install
-if [ $? -ne 0 ]; then
-  echo "❌ Failed to install backend dependencies"
-  exit 1
+# Set permissions
+sudo chmod 500 "$INSTALL_DIR/app.js" "$INSTALL_DIR/start.sh"
+sudo chmod +x "$INSTALL_DIR/start.sh"
+[[ -f "$INSTALL_DIR/node" ]] && sudo chmod 500 "$INSTALL_DIR/node"
+
+# Make immutable
+if [[ "$OS" == "linux" && -x "$(command -v chattr)" ]]; then
+  sudo chattr +i "$INSTALL_DIR/app.js" "$INSTALL_DIR/start.sh"
+  [[ -f "$INSTALL_DIR/node" ]] && sudo chattr +i "$INSTALL_DIR/node"
+elif [[ "$OS" == "darwin" ]]; then
+  sudo chflags uchg "$INSTALL_DIR/app.js" "$INSTALL_DIR/start.sh"
+  [[ -f "$INSTALL_DIR/node" ]] && sudo chflags uchg "$INSTALL_DIR/node"
 fi
 
-# Install webapp dependencies
-echo "📦 Installing webapp dependencies"
-cd "$INSTALL_DIR/webapp"
-yarn install --prod
-if [ $? -ne 0 ]; then
-  echo "❌ Failed to install webapp dependencies"
-  exit 1
-fi
+# Create launcher
+echo "🔗 Creating launcher at $BIN_LINK..."
+echo "#!/bin/bash
+exec \"$INSTALL_DIR/start.sh\" \"\$@\"" | sudo tee "$BIN_LINK" > /dev/null
+sudo chmod +x "$BIN_LINK"
 
-cd "$INSTALL_DIR"
-
-# Build the application
-echo "🔨 Building the backend"
-yarn build:hotwallet
-if [ $? -ne 0 ]; then
-  echo "❌ Failed to build the backend"
-  exit 1
-fi
-
-echo "🔨 Building the webapp"
-cd "$INSTALL_DIR/webapp" && yarn build
-if [ $? -ne 0 ]; then
-  echo "❌ Failed to build the webapp"
-  exit 1
-fi
-cd "$INSTALL_DIR"
-
-echo "✅ Installation completed successfully!"
-
-echo ""
-echo "📝 Next Steps:"
-echo "1. Your application is available in: $INSTALL_DIR"
-echo "2. To start the server, run: $INSTALL_DIR/start.sh"
-echo ""
+echo "✅ Installed $APP_NAME"
+echo "➡️  Run with: $APP_NAME"

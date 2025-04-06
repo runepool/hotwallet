@@ -13,9 +13,9 @@ jobs:
     permissions: write-all
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [linux, darwin]
         node_version: [20.9.0]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'darwin' && 'macos-latest' || 'ubuntu-latest' }}
     name: Build on ${{ matrix.os }}
 
     steps:
