@@ -46,6 +46,19 @@ export class AccountService {
     private readonly autoSplitConfigService: AutoSplitConfigService
   ) { }
 
+  async getWalletAddress(): Promise<string> {
+    try {
+      const address = await this.bitcoinWalletService.getAddress();
+      if (!address) {
+        throw new Error('No wallet address available');
+      }
+      return address;
+    } catch (error) {
+      Logger.error('Error getting wallet address:', error);
+      throw error;
+    }
+  }
+
   async getBalance(): Promise<{ address: string; balance: number, token: string }[]> {
     const btcBalance = {
       address: '',
@@ -55,6 +68,7 @@ export class AccountService {
     }
     let address;
     try {
+      // Initialize the wallet with the password if provided
       address = await this.bitcoinWalletService.getAddress();
       if (!address) {
         return [btcBalance];
@@ -234,8 +248,10 @@ export class AccountService {
     return psbt;
   }
 
-  async splitAsset(assetName: string, splits: number, amountPerSplit: number): Promise<string> {
+  async splitAsset(assetName: string, splits: number, amountPerSplit: number, password?: string): Promise<string> {
     try {
+      // Initialize the wallet with the password if provided
+      await this.bitcoinWalletService.init(password);
       const address = await this.bitcoinWalletService.getAddress();
       if (!address) {
         throw new Error('No wallet address available');
@@ -252,7 +268,7 @@ export class AccountService {
         return Object.entries(output.runes).some(([token]) => token === assetName && !output.spent);
       });
 
-      let signedPsbt = this.bitcoinWalletService.signPsbt(psbt, []);
+      let signedPsbt = await this.bitcoinWalletService.signPsbt(psbt, []);
 
       const tx = signedPsbt.finalizeAllInputs().extractTransaction();
       const txid = await this.bitcoinService.broadcast(tx.toHex());

@@ -66,7 +66,7 @@ export class EventHandlerService {
         await this.validatePsbt(psbt, data.tradeId);
         const pubkey = await this.walletService.getPublicKey();
         const signableInputs = data.inputsToSign.filter(input => input.signerAddress === pubkey);
-        const signedPsbt = this.walletService.signPsbt(psbt, signableInputs.map(input => input.index));
+        const signedPsbt = await this.walletService.signPsbt(psbt, signableInputs.map(input => input.index));
         Logger.debug('Sending sign response');
         await this.webSocketService.publishDirectMessage(JSON.stringify(
             Object.assign(new Message<SignResponse>(), {

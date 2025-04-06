@@ -13,6 +13,9 @@ export class SettingsEntity {
 
   @Column({ nullable: true })
   websocketUrl?: string;
+  
+  @Column({ default: false })
+  hasPassword: boolean;
 
   @UpdateDateColumn()
   updatedAt: Date;

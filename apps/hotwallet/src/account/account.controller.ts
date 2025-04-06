@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Delete, Headers, UnauthorizedException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { AccountService } from './account.service';
 import { SplitAssetDto } from './dto/split-asset.dto';
 import { AutoSplitConfigDto } from './dto/auto-split-config.dto';
@@ -9,33 +9,91 @@ import { AutoSplitConfigDto } from './dto/auto-split-config.dto';
 export class AccountController {
   constructor(private readonly accountService: AccountService) {}
 
+  @Get('address')
+  @ApiOperation({ summary: 'Get the wallet address' })
+  @ApiHeader({ name: 'X-Password', required: false, description: 'Password for decrypting the Bitcoin private key' })
+  @ApiResponse({ status: 200, description: 'The wallet address was successfully retrieved.' })
+  @ApiResponse({ status: 401, description: 'Invalid password or password required.' })
+  @ApiResponse({ status: 500, description: 'An error occurred while fetching the wallet address.' })
+  async getWalletAddress(@Headers('x-password') password?: string) {
+    try {
+      const address = await this.accountService.getWalletAddress(password);
+      return { address };
+    } catch (error) {
+      if (error.message === 'Password required to decrypt Bitcoin private key') {
+        throw new UnauthorizedException('Password required');
+      }
+      if (error.message === 'Invalid password') {
+        throw new UnauthorizedException('Invalid password');
+      }
+      throw error;
+    }
+  }
+
   @Get('balance')
   @ApiOperation({ summary: 'Get the wallet balance' })
+  @ApiHeader({ name: 'X-Password', required: false, description: 'Password for decrypting the Bitcoin private key' })
   @ApiResponse({ status: 200, description: 'The wallet balance was successfully retrieved.' })
+  @ApiResponse({ status: 401, description: 'Invalid password or password required.' })
   @ApiResponse({ status: 500, description: 'An error occurred while fetching the wallet balance.' })
-  async getBalance() {
-    return await this.accountService.getBalance();
+  async getBalance(@Headers('x-password') password?: string) {
+    try {
+      return await this.accountService.getBalance(password);
+    } catch (error) {
+      if (error.message === 'Password required to decrypt Bitcoin private key') {
+        throw new UnauthorizedException('Password required');
+      }
+      if (error.message === 'Invalid password') {
+        throw new UnauthorizedException('Invalid password');
+      }
+      throw error;
+    }
   }
 
   @Get('liquidity-health')
   @ApiOperation({ summary: 'Get the account liquidity health' })
+  @ApiHeader({ name: 'X-Password', required: false, description: 'Password for decrypting the Bitcoin private key' })
   @ApiResponse({ status: 200, description: 'The liquidity health was successfully retrieved.' })
+  @ApiResponse({ status: 401, description: 'Invalid password or password required.' })
   @ApiResponse({ status: 500, description: 'An error occurred while fetching the liquidity health.' })
-  async getLiquidityHealth() {
-    return await this.accountService.getLiquidityHealth();
+  async getLiquidityHealth(@Headers('x-password') password?: string) {
+    try {
+      return await this.accountService.getLiquidityHealth(password);
+    } catch (error) {
+      if (error.message === 'Password required to decrypt Bitcoin private key') {
+        throw new UnauthorizedException('Password required');
+      }
+      if (error.message === 'Invalid password') {
+        throw new UnauthorizedException('Invalid password');
+      }
+      throw error;
+    }
   }
 
   @Post('split-asset')
   @ApiOperation({ summary: 'Split an asset into multiple UTXOs' })
+  @ApiHeader({ name: 'X-Password', required: false, description: 'Password for decrypting the Bitcoin private key' })
   @ApiResponse({ status: 200, description: 'The asset was successfully split.' })
   @ApiResponse({ status: 400, description: 'Invalid request parameters.' })
+  @ApiResponse({ status: 401, description: 'Invalid password or password required.' })
   @ApiResponse({ status: 500, description: 'An error occurred while splitting the asset.' })
-  async splitAsset(@Body() splitAssetDto: SplitAssetDto) {
-    return await this.accountService.splitAsset(
-      splitAssetDto.asset_name,
-      splitAssetDto.splits,
-      splitAssetDto.amount_per_split
-    );
+  async splitAsset(@Body() splitAssetDto: SplitAssetDto, @Headers('x-password') password?: string) {
+    try {
+      return await this.accountService.splitAsset(
+        splitAssetDto.asset_name,
+        splitAssetDto.splits,
+        splitAssetDto.amount_per_split,
+        password
+      );
+    } catch (error) {
+      if (error.message === 'Password required to decrypt Bitcoin private key') {
+        throw new UnauthorizedException('Password required');
+      }
+      if (error.message === 'Invalid password') {
+        throw new UnauthorizedException('Invalid password');
+      }
+      throw error;
+    }
   }
 
   @Post('auto-split')
