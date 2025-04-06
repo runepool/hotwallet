@@ -63,21 +63,22 @@ jobs:
           curl -fsSL "https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-${OS}-${ARCH}.tar.xz" | tar -xJ
           cp "node-${NODE_VER}-${OS}-${ARCH}/bin/node" bundle/node
           chmod +x bundle/node
-
+          
       - name: Package bundle
         run: |
-          TAR_NAME="runepool-hotwallet-${{ matrix.os }}.tar.gz"
-          tar -czf "$TAR_NAME" -C bundle .
-          mv "$TAR_NAME" runepool-hotwallet.tar.gz
+          TAG=${{ github.ref_name }}
+          FILENAME="runepool-hotwallet-${TAG}-${{ matrix.os }}.tar.gz"
+          tar -czf "$FILENAME" -C bundle .
+          echo "FILENAME=$FILENAME" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: yourapp-${{ matrix.os }}
-          path: runepool-hotwallet.tar.gz
+          name: runepool-hotwallet-${{ github.ref_name }}-${{ matrix.os }}
+          path: ${{ env.FILENAME }}
 
       - name: Upload artifact to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: runepool-hotwallet-*.tar.gz
+          files: ${{ env.FILENAME }}
