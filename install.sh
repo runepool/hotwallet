@@ -46,16 +46,16 @@ if [[ "$OS" == "darwin" ]]; then
 fi
 
 # Set permissions
-sudo chmod 500 "$INSTALL_DIR/app.js" "$INSTALL_DIR/start.sh"
+sudo chmod 500 "$INSTALL_DIR/index.js" "$INSTALL_DIR/start.sh"
 sudo chmod +x "$INSTALL_DIR/start.sh"
 [[ -f "$INSTALL_DIR/node" ]] && sudo chmod 500 "$INSTALL_DIR/node"
 
 # Make immutable
 if [[ "$OS" == "linux" && -x "$(command -v chattr)" ]]; then
-  sudo chattr +i "$INSTALL_DIR/app.js" "$INSTALL_DIR/start.sh"
+  sudo chattr +i "$INSTALL_DIR/index.js" "$INSTALL_DIR/start.sh"
   [[ -f "$INSTALL_DIR/node" ]] && sudo chattr +i "$INSTALL_DIR/node"
 elif [[ "$OS" == "darwin" ]]; then
-  sudo chflags uchg "$INSTALL_DIR/app.js" "$INSTALL_DIR/start.sh"
+  sudo chflags uchg "$INSTALL_DIR/index.js" "$INSTALL_DIR/start.sh"
   [[ -f "$INSTALL_DIR/node" ]] && sudo chflags uchg "$INSTALL_DIR/node"
 fi
 

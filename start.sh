@@ -63,7 +63,7 @@ echo "🧩  Node.js        : $([[ "$USE_SYSTEM_NODE" == true ]] && echo 'system'
 echo ""
 
 # Paths
-MAIN_JS="$APP_DIR/main.js"
+MAIN_JS="$APP_DIR/index.js"
 FRONTEND_BUILD="$APP_DIR/webapp/dist"
 NODE_BIN="$APP_DIR/node"
 NODE_CMD="$([[ "$USE_SYSTEM_NODE" == true ]] && command -v node || echo "$NODE_BIN")"
