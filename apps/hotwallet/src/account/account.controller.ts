@@ -39,16 +39,13 @@ export class AccountController {
   @ApiResponse({ status: 200, description: 'The wallet address was successfully retrieved.' })
   @ApiResponse({ status: 401, description: 'Invalid password or password required.' })
   @ApiResponse({ status: 500, description: 'An error occurred while fetching the wallet address.' })
-  async getWalletAddress(@Headers('x-password') password?: string) {
+  async getWalletAddress() {
     try {
-      const address = await this.accountService.getWalletAddress(password);
+      const address = await this.accountService.getWalletAddress();
       return { address };
     } catch (error) {
       if (error.message === 'Password required to decrypt Bitcoin private key') {
         throw new UnauthorizedException('Password required');
-      }
-      if (error.message === 'Invalid password') {
-        throw new UnauthorizedException('Invalid password');
       }
       throw error;
     }
@@ -60,15 +57,12 @@ export class AccountController {
   @ApiResponse({ status: 200, description: 'The wallet balance was successfully retrieved.' })
   @ApiResponse({ status: 401, description: 'Invalid password or password required.' })
   @ApiResponse({ status: 500, description: 'An error occurred while fetching the wallet balance.' })
-  async getBalance(@Headers('x-password') password?: string) {
+  async getBalance() {
     try {
-      return await this.accountService.getBalance(password);
+      return await this.accountService.getBalance();
     } catch (error) {
       if (error.message === 'Password required to decrypt Bitcoin private key') {
         throw new UnauthorizedException('Password required');
-      }
-      if (error.message === 'Invalid password') {
-        throw new UnauthorizedException('Invalid password');
       }
       throw error;
     }
@@ -76,19 +70,15 @@ export class AccountController {
 
   @Get('liquidity-health')
   @ApiOperation({ summary: 'Get the account liquidity health' })
-  @ApiHeader({ name: 'X-Password', required: false, description: 'Password for decrypting the Bitcoin private key' })
   @ApiResponse({ status: 200, description: 'The liquidity health was successfully retrieved.' })
   @ApiResponse({ status: 401, description: 'Invalid password or password required.' })
   @ApiResponse({ status: 500, description: 'An error occurred while fetching the liquidity health.' })
-  async getLiquidityHealth(@Headers('x-password') password?: string) {
+  async getLiquidityHealth() {
     try {
-      return await this.accountService.getLiquidityHealth(password);
+      return await this.accountService.getLiquidityHealth();
     } catch (error) {
       if (error.message === 'Password required to decrypt Bitcoin private key') {
         throw new UnauthorizedException('Password required');
-      }
-      if (error.message === 'Invalid password') {
-        throw new UnauthorizedException('Invalid password');
       }
       throw error;
     }
