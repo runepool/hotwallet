@@ -46,6 +46,33 @@ export class AccountService {
     private readonly autoSplitConfigService: AutoSplitConfigService
   ) { }
 
+  async isLoggedIn(): Promise<boolean> {
+    try {
+      // Check if the wallet service is initialized
+      // This is a synchronous method, no need for await
+      return this.bitcoinWalletService.isInitialized();
+    } catch (error) {
+      Logger.error('Error checking login status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Logs the user out by resetting the wallet service
+   * @returns Promise resolving to true if logout was successful
+   */
+  async logout(): Promise<boolean> {
+    try {
+      // Reset the wallet service to clear all sensitive data
+      this.bitcoinWalletService.reset();
+      Logger.log('User logged out successfully');
+      return true;
+    } catch (error) {
+      Logger.error('Error during logout:', error);
+      return false;
+    }
+  }
+
   async getWalletAddress(): Promise<string> {
     try {
       const address = await this.bitcoinWalletService.getAddress();

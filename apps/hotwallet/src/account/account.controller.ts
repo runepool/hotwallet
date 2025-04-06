@@ -9,6 +9,30 @@ import { AutoSplitConfigDto } from './dto/auto-split-config.dto';
 export class AccountController {
   constructor(private readonly accountService: AccountService) {}
 
+  @Get('isLoggedIn')
+  @ApiOperation({ summary: 'Check if user is logged in' })
+  @ApiResponse({ status: 200, description: 'Returns login status' })
+  async isLoggedIn() {
+    try {
+      const isLoggedIn = await this.accountService.isLoggedIn();
+      return { isLoggedIn };
+    } catch (error) {
+      return { isLoggedIn: false };
+    }
+  }
+
+  @Post('logout')
+  @ApiOperation({ summary: 'Log the user out' })
+  @ApiResponse({ status: 200, description: 'Returns logout status' })
+  async logout() {
+    try {
+      const success = await this.accountService.logout();
+      return { success };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
   @Get('address')
   @ApiOperation({ summary: 'Get the wallet address' })
   @ApiHeader({ name: 'X-Password', required: false, description: 'Password for decrypting the Bitcoin private key' })

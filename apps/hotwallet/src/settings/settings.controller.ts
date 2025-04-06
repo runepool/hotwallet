@@ -1,13 +1,14 @@
-import { Controller, Get, Put, Post, Body, Headers, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Headers, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { SettingsService } from './settings.service';
 
 
-export class UserSettings {
-  bitcoinPrivateKey: string;
+export interface UserSettings {
+  bitcoinPrivateKey?: string;
   ordUrl: string;
-  websocketUrl: string;
+  websocketUrl?: string;
   hasPassword?: boolean;
+  password?: string; // Used for authentication when updating settings
 }
 
 export class PasswordSetupDto {
@@ -24,7 +25,7 @@ export class SettingsController {
 
   @Get()
   @ApiOperation({ summary: 'Get user settings' })
-  @ApiResponse({ status: 200, description: 'Returns the user settings', type: UserSettings })
+  @ApiResponse({ status: 200, description: 'Returns the user settings', type: Object })
   async getSettings(): Promise<UserSettings> {
     return this.settingsService.getSettings();
   }
@@ -32,9 +33,22 @@ export class SettingsController {
   @Put()
   @ApiOperation({ summary: 'Update user settings' })
   @ApiResponse({ status: 200, description: 'Settings updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid password' })
   async updateSettings(
     @Body() settings: UserSettings,
   ): Promise<void> {
+    if (!settings.password) {
+      throw new UnauthorizedException('Password is required');
+    }
+    
+    // Validate password if provided
+    if (settings.password) {
+      const isValid = await this.settingsService.validatePassword(settings.password);
+      if (!isValid) {
+        throw new UnauthorizedException('Invalid password');
+      }
+    }
+    
     await this.settingsService.updateSettings(settings);
   }
 
