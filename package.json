@@ -22,24 +22,6 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./apps/liquidium-dex/test/jest-e2e.json"
   },
-  "build": {
-    "appId": "com.runepool.app",
-    "productName": "runepool",
-    "files": [
-      "dist/**/*",
-      "webapp/dist/**/*",
-      "main.js"
-    ],
-    "win": {
-      "target": "nsis"
-    },
-    "mac": {
-      "target": "dmg"
-    },
-    "linux": {
-      "target": "AppIag"
-    }
-  },
   "dependencies": {
     "@bitcoinerlab/secp256k1": "^1.2.0",
     "@nestjs/axios": "^4.0.0",
@@ -52,7 +34,6 @@
     "@nestjs/swagger": "^11.0.3",
     "@nestjs/typeorm": "^11.0.0",
     "@noble/curves": "^1.8.1",
-    "argon2": "^0.41.1",
     "axios": "^1.7.9",
     "axios-retry": "^4.5.0",
     "better-sqlite3": "^11.8.1",
