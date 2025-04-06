@@ -9,6 +9,7 @@ import { HotWalletModule } from './hotwallet.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(HotWalletModule);
+  
   // Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('HotWallet API')
