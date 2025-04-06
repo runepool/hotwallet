@@ -100,7 +100,6 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: |
-            runepool-hotwallet-${{ github.ref_name }}-*.tar.gz
-            runepool-hotwallet-latest-*.tar.gz
+            runepool-hotwallet-*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
