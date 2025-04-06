@@ -57,10 +57,10 @@ jobs:
           ARGON_BINDING=$(find node_modules/argon2 -name '*.node' | head -n 1)
           cp "$ARGON_BINDING" bundle/argon2.node
 
-            - name: Copy frontend build
-              run: |
-                mkdir -p bundle/webapp
-                cp -r webapp/dist bundle/webapp/
+      - name: Copy frontend build
+        run: |
+          mkdir -p bundle/webapp
+          cp -r webapp/dist bundle/webapp/
 
       - name: Copy start.sh
         run: cp start.sh bundle/start.sh && chmod +x bundle/start.sh
