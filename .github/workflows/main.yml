@@ -91,3 +91,16 @@ jobs:
           name: ${{ github.ref_name }}
           draft: false
           prerelease: false
+          
+      - name: Upload to public mirror repo
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          repository: runepool/hotwallet-install
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: |
+            runepool-hotwallet-${{ github.ref_name }}-*.tar.gz
+            runepool-hotwallet-latest-*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
