@@ -9,7 +9,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node_version: [18.19.0]
+        node_version: [20.9.0]
     runs-on: ${{ matrix.os }}
     name: Build on ${{ matrix.os }}
 
