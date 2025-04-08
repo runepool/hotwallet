@@ -1,10 +1,10 @@
-import { Module } from '@nestjs/common';
+import { WalletModule } from '@app/wallet';
 import { HttpModule } from '@nestjs/axios';
+import { Module } from '@nestjs/common';
 import { ExchangeClient } from './exchange.client';
-import { DatabaseSettingsModule } from '@app/database/settings/settings.module';
 
 @Module({
-  imports: [HttpModule, DatabaseSettingsModule],
+  imports: [HttpModule, WalletModule],
   providers: [ExchangeClient],
   exports: [ExchangeClient],
 })
