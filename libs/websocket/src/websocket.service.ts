@@ -26,9 +26,9 @@ export class WebSocketService implements OnModuleInit {
         // Get WebSocket URL from settings
         try {
             const settings = await this.settingsService.getSettings();
-            this.serverUrl = settings.websocketUrl || 'wss://ws.runepool.org';
+            this.serverUrl = settings.websocketUrl || 'ws://localhost:8080';
+
             this.logger.log(`Using WebSocket server URL: ${this.serverUrl}`);
-            this.clientId = await this.walletService.getPublicKey();
 
             // Try to connect to the WebSocket server
             try {
@@ -40,23 +40,24 @@ export class WebSocketService implements OnModuleInit {
             }
         } catch (error) {
             this.logger.error(`Failed to get WebSocket URL from settings: ${error.message}`);
-            this.serverUrl = process.env.WS_URL || 'wss://ws.runepool.org';
             this.scheduleReconnect();
         }
     }
 
     // Connect to a WebSocket server
     async connectToServer(): Promise<void> {
+        const clientId = await this.walletService.getPublicKey();
         return new Promise((resolve, reject) => {
             try {
                 this.wsConnection = new WebSocket(this.serverUrl);
 
-                this.wsConnection.on('open', () => {
+                this.wsConnection.on('open', async () => {
                     this.reconnectAttempts = 0;
+
                     // Register with the server
                     this.wsConnection.send(JSON.stringify({
                         type: 'register',
-                        clientId: this.clientId
+                        clientId: clientId
                     }));
                     this.logger.log(`Connected to WebSocket server at ${this.serverUrl}`);
                     resolve();
@@ -93,7 +94,7 @@ export class WebSocketService implements OnModuleInit {
     }
 
     private scheduleReconnect(): void {
-        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 3000);
         this.reconnectAttempts++;
 
         this.logger.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
