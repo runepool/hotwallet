@@ -88,7 +88,7 @@ export class BitcoinWalletService {
             return Buffer.from(await this.encryptionService.decrypt(this._keyShards[this._shardKeys.indexOf(shardKey)], shardKey.toString('hex')), 'hex');
         }));
 
-        const keyBuffer = await combine(decryptedShards).then(data => Buffer.from(data));
+        const keyBuffer = await combine(decryptedShards.map(shard => Uint8Array.from(shard))).then(data => Buffer.from(data));
         const signer = this.importWalletFromPrivateKey(keyBuffer);
         const result = fn(signer);
         keyBuffer.fill(0);
