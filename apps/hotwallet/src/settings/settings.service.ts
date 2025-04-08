@@ -18,7 +18,7 @@ export class SettingsService {
     return {
       bitcoinPrivateKey: settings.bitcoinPrivateKey ? 'xxx' : '',
       ordUrl: settings.ordUrl,
-      websocketUrl: settings.websocketUrl || 'wss://ws.runepool.io',
+      websocketUrl: settings.websocketUrl || 'wss://ws.runepool.org',
       hasPassword: settings.hasPassword || false,
     };
   }

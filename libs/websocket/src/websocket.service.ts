@@ -26,7 +26,7 @@ export class WebSocketService implements OnModuleInit {
         // Get WebSocket URL from settings
         try {
             const settings = await this.settingsService.getSettings();
-            this.serverUrl = settings.websocketUrl || 'wss://ws.runepool.io';
+            this.serverUrl = settings.websocketUrl || 'wss://ws.runepool.org';
             this.logger.log(`Using WebSocket server URL: ${this.serverUrl}`);
             this.clientId = await this.walletService.getPublicKey();
 
@@ -40,7 +40,7 @@ export class WebSocketService implements OnModuleInit {
             }
         } catch (error) {
             this.logger.error(`Failed to get WebSocket URL from settings: ${error.message}`);
-            this.serverUrl = process.env.WS_URL || 'wss://ws.runepool.io';
+            this.serverUrl = process.env.WS_URL || 'wss://ws.runepool.org';
             this.scheduleReconnect();
         }
     }
