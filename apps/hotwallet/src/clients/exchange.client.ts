@@ -11,7 +11,7 @@ import { CreateTradeDto } from './dto/trade.dto';
 
 @Injectable()
 export class ExchangeClient {
-  private readonly baseUrl = process.env.NODE_ENV !== 'production' ? 'https://exchange-api.runepool.org' : 'http://localhost:3001';
+  private readonly baseUrl = process.env.NODE_ENV === 'production' ? 'https://exchange-api.runepool.org' : 'http://localhost:3001';
 
   constructor(
     private readonly walletService: BitcoinWalletService,
