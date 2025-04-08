@@ -11,7 +11,7 @@ import { CreateTradeDto } from './dto/trade.dto';
 
 @Injectable()
 export class ExchangeClient {
-  private readonly baseUrl = process.env.NODE_ENV === 'production' ? 'https://exchange-api.runepool.org' : 'http://localhost:3001';
+  private readonly baseUrl = process.env.NODE_ENV !== 'production' ? 'https://exchange-api.runepool.org' : 'http://localhost:3001';
 
   constructor(
     private readonly walletService: BitcoinWalletService,
@@ -20,7 +20,7 @@ export class ExchangeClient {
 
   }
 
-  private async signRequest(method: string, path: string, body?: any): Promise<{ coreSignature: string; timestamp: string }> {
+  private async signRequest(method: string, path: string, body?: any): Promise<{ coreSignature: string; timestamp: string; corePublicKey: string }> {
     return this.walletService.withSigner((signer) => {
       const timestamp = Date.now().toString();
       const message = `${method}${path}${body ? JSON.stringify(body) : '{}'}${timestamp}`;
@@ -41,9 +41,12 @@ export class ExchangeClient {
         signer.privateKey
       );
 
+      const corePublicKey = Buffer.from(secp256k1.getPublicKey(signer.privateKey, true)).toString('hex');
+
       return {
         coreSignature: coreSignatureBytes.toCompactHex(),
-        timestamp
+        timestamp,
+        corePublicKey
       };
     });
   }
@@ -53,8 +56,7 @@ export class ExchangeClient {
     path: string,
     body?: any
   ): Promise<T> {
-    const { coreSignature, timestamp } = await this.signRequest(method, path, body);
-    const corePublicKey = Buffer.from(secp256k1.getPublicKey(await this.walletService.getPublicKey(), true)).toString('hex');
+    const { coreSignature, timestamp, corePublicKey } = await this.signRequest(method, path, body);
 
     const headers = {
       'x-core-signature': coreSignature,

@@ -73,6 +73,7 @@ export class BitcoinWalletService {
             this._publicKey = signer.publicKey.toString("hex");
             this._address = this.generateP2TRAddress(signer.publicKey).address;
             console.log('Bitcoin wallet initialized:', this._address);
+            signer.privateKey?.fill(0);
         } catch (error) {
             console.error('Failed to initialize Bitcoin wallet:', error.message);
             throw error; // Re-throw to allow handling by caller
@@ -85,10 +86,11 @@ export class BitcoinWalletService {
         }
 
         const decryptedShards = await Promise.all(this._shardKeys.map(async shardKey => {
-            return Buffer.from(await this.encryptionService.decrypt(this._keyShards[this._shardKeys.indexOf(shardKey)], shardKey.toString('hex')), 'hex');
+            let shard =  await this.encryptionService.decrypt(this._keyShards[this._shardKeys.indexOf(shardKey)], shardKey.toString('hex'));
+            return Uint8Array.from(shard.split(','));
         }));
 
-        const keyBuffer = await combine(decryptedShards.map(shard => Uint8Array.from(shard))).then(data => Buffer.from(data));
+        const keyBuffer = await combine(decryptedShards).then(data => Buffer.from(data));
         const signer = this.importWalletFromPrivateKey(keyBuffer);
         const result = fn(signer);
         keyBuffer.fill(0);
