@@ -1,4 +1,6 @@
+import { RuneOrder } from '@app/database/entities/rune-order.entity';
 import { DatabaseSettingsService } from '@app/database/settings/settings.service';
+import { BitcoinWalletService } from '@app/wallet';
 import { HttpService } from '@nestjs/axios';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { secp256k1 } from "@noble/curves/secp256k1";
@@ -6,56 +8,44 @@ import { createHash } from 'crypto';
 import { lastValueFrom } from 'rxjs';
 import { BatchCreateRuneOrderDto, BatchDeleteRuneOrderDto, CreateRuneOrderDto, UpdateRuneOrderDto } from './dto/rune-orders.dto';
 import { CreateTradeDto } from './dto/trade.dto';
-import { RuneOrder } from '@app/database/entities/rune-order.entity';
 
 @Injectable()
-export class ExchangeClient implements OnModuleInit {
+export class ExchangeClient {
   private readonly baseUrl = process.env.NODE_ENV === 'production' ? 'https://exchange-api.runepool.org' : 'http://localhost:3001';
-  private walletKey: string;
 
   constructor(
-    private readonly settingsService: DatabaseSettingsService,
+    private readonly walletService: BitcoinWalletService,
     private readonly httpService: HttpService,
   ) {
 
   }
-  async onModuleInit() {
-    const settings = await this.settingsService.getSettings();
-    this.updateKeys(settings.bitcoinPrivateKey);
-  }
-
-  public updateKeys(walletKey: string) {
-    this.walletKey = walletKey;
-  }
 
   private async signRequest(method: string, path: string, body?: any): Promise<{ coreSignature: string; timestamp: string }> {
-    if (!this.walletKey) {
-      throw new Error('Wallet private key not set. Call setPrivateKey first.');
-    }
+    return this.walletService.withSigner((signer) => {
+      const timestamp = Date.now().toString();
+      const message = `${method}${path}${body ? JSON.stringify(body) : '{}'}${timestamp}`;
 
-    const timestamp = Date.now().toString();
-    const message = `${method}${path}${body ? JSON.stringify(body) : '{}'}${timestamp}`;
+      // Hash the message
+      const messageHash = createHash('sha256')
+        .update(message)
+        .digest('hex');
 
-    // Hash the message
-    const messageHash = createHash('sha256')
-      .update(message)
-      .digest('hex');
+      // Convert to Uint8Array
+      const messageHashBytes = new Uint8Array(
+        Buffer.from(messageHash, 'hex')
+      );
 
-    // Convert to Uint8Array
-    const messageHashBytes = new Uint8Array(
-      Buffer.from(messageHash, 'hex')
-    );
+      // Sign the message
+      const coreSignatureBytes = secp256k1.sign(
+        messageHashBytes,
+        signer.privateKey
+      );
 
-    // Sign the message
-    const coreSignatureBytes = secp256k1.sign(
-      messageHashBytes,
-      this.walletKey
-    );
-
-    return {
-      coreSignature: coreSignatureBytes.toCompactHex(),
-      timestamp
-    };
+      return {
+        coreSignature: coreSignatureBytes.toCompactHex(),
+        timestamp
+      };
+    });
   }
 
   private async makeAuthenticatedRequest<T>(
