@@ -54,7 +54,7 @@ export class ExchangeClient {
     body?: any
   ): Promise<T> {
     const { coreSignature, timestamp } = await this.signRequest(method, path, body);
-    const corePublicKey = Buffer.from(secp256k1.getPublicKey(this.walletKey, true)).toString('hex');
+    const corePublicKey = Buffer.from(secp256k1.getPublicKey(await this.walletService.getPublicKey(), true)).toString('hex');
 
     const headers = {
       'x-core-signature': coreSignature,
