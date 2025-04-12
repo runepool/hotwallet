@@ -11,6 +11,7 @@ import { appendUnspentOutputsAsNetworkFee } from '@app/blockchain/psbtUtils';
 import { AutoSplitConfigService } from '@app/database/auto-split/auto-split.service';
 import { TransactionType } from '@app/database/entities/transaction.entity';
 import { TransactionStatus } from '@app/database/entities/transaction.entity';
+import { randomUUID } from 'crypto';
 
 type OutputHealth = {
   location: string;
@@ -37,6 +38,7 @@ type AutoSplitConfig = {
 
 @Injectable()
 export class AccountService {
+  private readonly logger = new Logger(AccountService.name);
   constructor(
     private readonly transactionsDbService: TransactionsDbService,
     private readonly runeService: RunesService,
@@ -275,32 +277,95 @@ export class AccountService {
     return psbt;
   }
 
-  async splitAsset(assetName: string, splits: number, amountPerSplit: number, password?: string): Promise<string> {
+  private checkSufficientFunds(outputInfo: any[], assetName: string, splits: number, amountPerSplit: number): { sufficient: boolean; message: string } {
     try {
-      // Initialize the wallet with the password if provided
-      await this.bitcoinWalletService.init(password);
+      // For BTC, check if there's enough BTC for the split and fees
+      if (assetName === 'BTC') {
+        const totalBtcAvailable = outputInfo.reduce((sum, output) => {
+          if (!output.spent && Object.keys(output.runes).length === 0) {
+            return sum + output.value;
+          }
+          return sum;
+        }, 0);
+
+        // Rough estimate: each split needs ~1000 sats for fees plus the amount
+        const estimatedRequired = (splits * amountPerSplit) + (splits * 1000);
+
+        if (totalBtcAvailable < estimatedRequired) {
+          return {
+            sufficient: false,
+            message: `Insufficient BTC. Available: ${totalBtcAvailable} sats, Required: ~${estimatedRequired} sats (including fees)`
+          };
+        }
+      } else {
+        // For runes, check if there's enough of the specific rune
+        const totalRuneAvailable = outputInfo.reduce((sum, output) => {
+          if (!output.spent && output.runes[assetName]) {
+            return sum + parseInt(output.runes[assetName]);
+          }
+          return sum;
+        }, 0);
+
+        const totalRequired = splits * amountPerSplit;
+
+        if (totalRuneAvailable < totalRequired) {
+          return {
+            sufficient: false,
+            message: `Insufficient ${assetName}. Available: ${totalRuneAvailable}, Required: ${totalRequired}`
+          };
+        }
+
+        // Also check if there's enough BTC for fees
+        const totalBtcAvailable = outputInfo.reduce((sum, output) => {
+          if (!output.spent && Object.keys(output.runes).length === 0) {
+            return sum + output.value;
+          }
+          return sum;
+        }, 0);
+
+        // Rough estimate for fees
+        const estimatedFees = splits * 1000;
+
+        if (totalBtcAvailable < estimatedFees) {
+          return {
+            sufficient: false,
+            message: `Insufficient BTC for fees. Available: ${totalBtcAvailable} sats, Required for fees: ~${estimatedFees} sats`
+          };
+        }
+      }
+
+      return { sufficient: true, message: 'Sufficient funds' };
+    } catch (error) {
+      this.logger.error(`Error checking funds: ${error.message}`, error.stack);
+      return { sufficient: false, message: `Error checking funds: ${error.message}` };
+    }
+  }
+
+  async splitAsset(assetName: string, splits: number, amountPerSplit: number): Promise<{ txid?: string; error?: string }> {
+    try {
       const address = await this.bitcoinWalletService.getAddress();
       if (!address) {
-        throw new Error('No wallet address available');
+        return { error: 'No wallet address available' };
       }
 
       const utxos = await this.ordService.address(address);
       const outputInfo = await this.ordService.outputBatch(utxos.outputs);
 
-      const psbt = await this.createSplitPsbt(address, assetName, splits, amountPerSplit, outputInfo);
-      const unspentOutputs = outputInfo.filter(output => {
-        if (assetName === 'BTC') {
-          return Object.keys(output.runes).length == 0;
-        }
-        return Object.entries(output.runes).some(([token]) => token === assetName && !output.spent);
-      });
+      // Check if there are sufficient funds before proceeding
+      const hasEnoughFunds = this.checkSufficientFunds(outputInfo, assetName, splits, amountPerSplit);
+      if (!hasEnoughFunds.sufficient) {
+        return { error: hasEnoughFunds.message };
+      }
 
+      const psbt = await this.createSplitPsbt(address, assetName, splits, amountPerSplit, outputInfo);
       let signedPsbt = await this.bitcoinWalletService.signPsbt(psbt, []);
 
       const tx = signedPsbt.finalizeAllInputs().extractTransaction();
       const txid = await this.bitcoinService.broadcast(tx.toHex());
+      const tradeId = randomUUID();
       await this.transactionsDbService.save([{
         txid: txid,
+        tradeId,
         type: TransactionType.SPLIT,
         status: TransactionStatus.PENDING,
         orders: '',
@@ -309,10 +374,21 @@ export class AccountService {
         rune: assetName
       }]);
 
-      return txid;
+      return { txid };
     } catch (error) {
-      Logger.error('Error splitting asset:', error);
-      throw error;
+      this.logger.error(`Error splitting asset: ${error.message}`, error.stack);
+
+      // Handle specific error types
+      if (error.message.includes('insufficient') || error.message.includes('enough funds')) {
+        return { error: `Insufficient funds: ${error.message}` };
+      }
+
+      // Handle other common errors
+      if (error.message.includes('fee') || error.message.includes('rate')) {
+        return { error: `Fee issue: ${error.message}` };
+      }
+
+      return { error: `Failed to split asset: ${error.message}` };
     }
   }
 

@@ -16,7 +16,7 @@ export class DatabaseSettingsService {
       // Return default settings if none exist
     return this.settingsRepository.save({
         ordUrl: 'https://ord.runepool.org',
-        websocketUrl: 'wss://ws.runepool.org',
+        websocketUrl: process.env.WS_URL || 'wss://ws.runepool.org',
       });
     }
     return settings;

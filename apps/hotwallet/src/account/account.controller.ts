@@ -91,22 +91,24 @@ export class AccountController {
   @ApiResponse({ status: 400, description: 'Invalid request parameters.' })
   @ApiResponse({ status: 401, description: 'Invalid password or password required.' })
   @ApiResponse({ status: 500, description: 'An error occurred while splitting the asset.' })
-  async splitAsset(@Body() splitAssetDto: SplitAssetDto, @Headers('x-password') password?: string) {
+  async splitAsset(@Body() splitAssetDto: SplitAssetDto) {
     try {
-      return await this.accountService.splitAsset(
+      const result = await this.accountService.splitAsset(
         splitAssetDto.asset_name,
         splitAssetDto.splits,
-        splitAssetDto.amount_per_split,
-        password
+        splitAssetDto.amount_per_split
       );
+      
+      // If there's an error, return it with a 400 status code
+      if (result.error) {
+        return { success: false, error: result.error };
+      }
+      
+      // If successful, return the txid
+      return { success: true, txid: result.txid };
     } catch (error) {
-      if (error.message === 'Password required to decrypt Bitcoin private key') {
-        throw new UnauthorizedException('Password required');
-      }
-      if (error.message === 'Invalid password') {
-        throw new UnauthorizedException('Invalid password');
-      }
-      throw error;
+      // Handle any unexpected errors
+      return { success: false, error: `Unexpected error: ${error.message}` };
     }
   }
 

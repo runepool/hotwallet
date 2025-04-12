@@ -6,7 +6,7 @@ import { EventHandlerService } from './event-handler/event-handler.service';
 
 export const MAKER_BONUS = 100;
 export const PROTOCOL_FEE = 100;
-export const PROTOCOL_FEE_OUTPUT = 'bc1pughzj2s7d2979z3vaf0reaszrx5pye9k8glwvvha7yh0nt64kgzsx83r0c';
+export const PROTOCOL_FEE_OUTPUT = 'bc1pk6zlfs8qd8q9qrremtzuwz3auwk4zts2evpjuhm2y3en8wjtuu9qr00smw';
 
 @Injectable()
 export class ExecutionService implements OnModuleInit {
