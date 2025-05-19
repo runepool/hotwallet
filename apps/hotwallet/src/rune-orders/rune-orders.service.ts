@@ -167,15 +167,14 @@ export class RuneOrdersService {
 
   /**
    * Deletes multiple orders in a batch operation
-   * @param batchData Object containing array of orders to delete
+   * @param orderIds Array of order IDs to delete
    * @returns Promise that resolves when the operation is complete
    */
-  async deleteBatchOrders(batchData: { orders: RuneOrder[] }): Promise<void> {
-    if (!batchData.orders || batchData.orders.length === 0) {
+  async deleteBatchOrders(orderIds: string[]): Promise<void> {
+    if (!orderIds || orderIds.length === 0) {
       return;
     }
 
-    const orderIds = batchData.orders.map(order => order.id);
     this.logger.log(`Deleting ${orderIds.length} orders in batch`);
 
     try {

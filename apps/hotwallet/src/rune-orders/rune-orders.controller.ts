@@ -3,6 +3,10 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { CreateRuneOrderDto, CreateBatchRuneOrderDto } from '../dto/rune-orders.dto';
 import { RuneOrdersService } from './rune-orders.service';
 
+interface BatchDeleteOrdersDto {
+  orderIds: string[];
+}
+
 @ApiTags('Orders')
 @Controller('orders')
 export class RuneOrdersController {
@@ -51,5 +55,12 @@ export class RuneOrdersController {
   @ApiResponse({ status: 200, description: 'Order deleted successfully.' })
   async deleteOrderById(@Param('orderId') orderId: string) {
     return this.ordersService.deleteOrder(orderId);
+  }
+  
+  @Delete()
+  @ApiOperation({ summary: 'Delete multiple orders by ID' })
+  @ApiResponse({ status: 200, description: 'Orders deleted successfully.' })
+  async deleteMultipleOrders(@Body() batchDeleteDto: BatchDeleteOrdersDto) {
+    return this.ordersService.deleteBatchOrders(batchDeleteDto.orderIds);
   }
 }
