@@ -371,7 +371,8 @@ export class AccountService {
         orders: '',
         amount: amountPerSplit.toString(),
         price: '0',
-        rune: assetName
+        rune: assetName,
+        reservedUtxos: JSON.stringify([])
       }]);
 
       return { txid };

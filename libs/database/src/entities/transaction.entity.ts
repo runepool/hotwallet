@@ -27,7 +27,7 @@ export class Transaction {
   @Column({ nullable: true })
   txid: string;
 
-  @Column({type:'text'})
+  @Column({type:'text', nullable: true})
   reservedUtxos: string
 
   @Column()
