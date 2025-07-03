@@ -1,5 +1,5 @@
 
-## Psbst output structure 
+## Psbt output structure 
 
 ```
 Buy Psbt:
@@ -21,8 +21,3 @@ Sell Psbt:
 n+2..m - Taker received amount
    m+1 - Protocol sats fee
 ```
-
-TODO: 
-
- -- Why does filled amount go negative
- -- Wrap up validation on maker side
